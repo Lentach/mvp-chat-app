@@ -1,0 +1,31 @@
+# docker-compose.yml — uruchamia PostgreSQL + aplikację NestJS
+services:
+  # Baza danych PostgreSQL
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chatdb
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Aplikacja NestJS
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: chatdb
+      JWT_SECRET: my-super-secret-jwt-key-change-in-production
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

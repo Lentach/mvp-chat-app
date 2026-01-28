@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\Lentach\\\\desktop\\\\mvp-chat-app\")",
+      "Bash(powershell -Command:*)",
+      "Bash(dir /b \"C:\\\\Users\\\\Lentach\\\\desktop\\\\mvp-chat-app\")",
+      "Bash(npx @nestjs/cli new:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm run build:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)",
+      "Bash(docker exec:*)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec:*)",
+      "Bash(npx --yes socket.io-client@4 node test-chat.mjs)",
+      "Bash(node --experimental-fetch test-chat.mjs:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
