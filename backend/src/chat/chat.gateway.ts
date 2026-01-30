@@ -378,6 +378,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    // Step 1: Find users (CRITICAL - if either user not found, fail)
     const sender = await this.usersService.findById(senderId);
     const recipient = await this.usersService.findByEmail(data.recipientEmail);
 
@@ -386,12 +387,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    // Step 2: Send friend request (CRITICAL - if this fails, entire operation fails)
+    let friendRequest: any;
+    let payload: any;
     try {
       this.logger.debug(`sendFriendRequest: sender=${sender.email} (id=${sender.id}), recipient=${recipient.email} (id=${recipient.id})`);
-      const friendRequest = await this.friendsService.sendRequest(sender, recipient);
+      friendRequest = await this.friendsService.sendRequest(sender, recipient);
       this.logger.debug(`sendFriendRequest: created request id=${friendRequest.id}, status=${friendRequest.status}`);
 
-      const payload = {
+      payload = {
         id: friendRequest.id,
         sender: { id: sender.id, email: sender.email, username: sender.username },
         receiver: { id: recipient.id, email: recipient.email, username: recipient.username },
@@ -399,20 +403,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         createdAt: friendRequest.createdAt,
         respondedAt: friendRequest.respondedAt,
       };
+    } catch (error) {
+      this.logger.error(`sendFriendRequest: Failed to send request:`, error);
+      client.emit('error', { message: error.message || 'Failed to send friend request' });
+      return; // Critical failure - stop here
+    }
 
-      // Check if it was auto-accepted (mutual request scenario)
-      if (friendRequest.status === 'accepted') {
-        this.logger.debug(`Auto-accept: ${sender.email} <-> ${recipient.email}`);
+    // Check if it was auto-accepted (mutual request scenario)
+    if (friendRequest.status === 'accepted') {
+      this.logger.debug(`Auto-accept: ${sender.email} <-> ${recipient.email}`);
+      const recipientSocketId = this.onlineUsers.get(recipient.id);
 
-        // It was auto-accepted! Emit acceptance events to both users
+      // Step 3a: Emit acceptance events (important but not critical)
+      try {
         client.emit('friendRequestAccepted', payload);
-
-        const recipientSocketId = this.onlineUsers.get(recipient.id);
         if (recipientSocketId) {
           this.server.to(recipientSocketId).emit('friendRequestAccepted', payload);
         }
+      } catch (error) {
+        this.logger.error('sendFriendRequest: Failed to emit friendRequestAccepted (non-critical):', error);
+      }
 
-        // Emit updated friends lists to both
+      // Step 3b: Emit friends lists (non-critical)
+      try {
         const senderFriends = await this.friendsService.getFriends(sender.id);
         const receiverFriends = await this.friendsService.getFriends(recipient.id);
 
@@ -425,12 +438,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             id: f.id, email: f.email, username: f.username
           })));
         }
+      } catch (error) {
+        this.logger.error('sendFriendRequest: Failed to emit friends lists (non-critical):', error);
+      }
 
-        // Create conversation between the two users
-        const conversation = await this.conversationsService.findOrCreate(sender, recipient);
+      // Step 3c: Create conversation and refresh lists (non-critical)
+      let conversation: any = null;
+      try {
+        conversation = await this.conversationsService.findOrCreate(sender, recipient);
         this.logger.debug(`Auto-accept: conversation created/found id=${conversation.id}`);
 
-        // Refresh conversations for both users
         const senderConversations = await this.conversationsService.findByUser(sender.id);
         const senderMapped = senderConversations.map((c) => ({
           id: c.id,
@@ -451,43 +468,59 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           }));
           this.server.to(recipientSocketId).emit('conversationsList', receiverMapped);
         }
+      } catch (error) {
+        this.logger.error('sendFriendRequest: Failed to create/refresh conversations (non-critical):', error);
+      }
 
-        // Emit openConversation for both users
-        client.emit('openConversation', { conversationId: conversation.id });
+      // Step 3d: Emit openConversation (non-critical)
+      try {
+        if (conversation) {
+          client.emit('openConversation', { conversationId: conversation.id });
 
-        if (recipientSocketId) {
-          this.server.to(recipientSocketId).emit('openConversation', {
-            conversationId: conversation.id
-          });
+          if (recipientSocketId) {
+            this.server.to(recipientSocketId).emit('openConversation', {
+              conversationId: conversation.id
+            });
+          }
         }
+      } catch (error) {
+        this.logger.error('sendFriendRequest: Failed to emit openConversation (non-critical):', error);
+      }
 
-        // Update pending counts for both
+      // Step 3e: Update pending counts (non-critical)
+      try {
         const senderCount = await this.friendsService.getPendingRequestCount(sender.id);
         client.emit('pendingRequestsCount', { count: senderCount });
         if (recipientSocketId) {
           const receiverCount = await this.friendsService.getPendingRequestCount(recipient.id);
           this.server.to(recipientSocketId).emit('pendingRequestsCount', { count: receiverCount });
         }
-      } else {
-        // Normal pending request flow
-        // Notify sender
+      } catch (error) {
+        this.logger.error('sendFriendRequest: Failed to update pending counts (non-critical):', error);
+      }
+    } else {
+      // Normal pending request flow
+      // Step 4a: Notify sender (important but not critical)
+      try {
         this.logger.debug(`sendFriendRequest: emitting friendRequestSent to sender ${sender.email}`);
         client.emit('friendRequestSent', payload);
+      } catch (error) {
+        this.logger.error('sendFriendRequest: Failed to emit friendRequestSent (non-critical):', error);
+      }
 
-        // Notify recipient if online
+      // Step 4b: Notify recipient if online (non-critical)
+      try {
         const recipientSocketId = this.onlineUsers.get(recipient.id);
         this.logger.debug(`sendFriendRequest: recipient ${recipient.email} (id=${recipient.id}) socketId=${recipientSocketId || 'OFFLINE'}`);
         if (recipientSocketId) {
           this.server.to(recipientSocketId).emit('newFriendRequest', payload);
-          // Also send updated count
           const count = await this.friendsService.getPendingRequestCount(recipient.id);
           this.server.to(recipientSocketId).emit('pendingRequestsCount', { count });
           this.logger.debug(`sendFriendRequest: emitted newFriendRequest + pendingRequestsCount(${count}) to recipient`);
         }
+      } catch (error) {
+        this.logger.error('sendFriendRequest: Failed to notify recipient (non-critical):', error);
       }
-    } catch (error) {
-      this.logger.error(`sendFriendRequest ERROR: ${error.message}`);
-      client.emit('error', { message: error.message });
     }
   }
 
@@ -508,9 +541,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    // Step 1: Accept the friend request (CRITICAL - if this fails, entire operation fails)
+    let friendRequest: any;
+    let senderSocketId: string | undefined;
     try {
       this.logger.debug(`acceptFriendRequest: requestId=${data.requestId}, userId=${userId}`);
-      const friendRequest = await this.friendsService.acceptRequest(data.requestId, userId);
+      friendRequest = await this.friendsService.acceptRequest(data.requestId, userId);
       this.logger.debug(`acceptFriendRequest: accepted, sender=${friendRequest.sender.id} (${friendRequest.sender.email}), receiver=${friendRequest.receiver.id} (${friendRequest.receiver.email})`);
 
       const payload = {
@@ -525,21 +561,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Notify both users
       client.emit('friendRequestAccepted', payload);
 
-      const senderSocketId = this.onlineUsers.get(friendRequest.sender.id);
+      senderSocketId = this.onlineUsers.get(friendRequest.sender.id);
       if (senderSocketId) {
         this.server.to(senderSocketId).emit('friendRequestAccepted', payload);
       }
+    } catch (error) {
+      this.logger.error('acceptFriendRequest: Failed to accept request:', error);
+      client.emit('error', { message: error.message || 'Failed to accept friend request' });
+      return; // Critical failure - stop here
+    }
 
-      // Create conversation between the two users so they appear on each other's lists
+    // Step 2: Create conversation (important but not critical - partial success possible)
+    let conversation: any = null;
+    try {
       const senderUser = await this.usersService.findById(friendRequest.sender.id);
       const receiverUser = await this.usersService.findById(friendRequest.receiver.id);
-      let conversation: any = null;
       if (senderUser && receiverUser) {
         conversation = await this.conversationsService.findOrCreate(senderUser, receiverUser);
         this.logger.debug(`acceptFriendRequest: conversation id=${conversation.id}`);
       }
+    } catch (error) {
+      this.logger.error('acceptFriendRequest: Failed to create conversation (non-critical):', error);
+      // Continue - users are friends even if conversation creation failed
+    }
 
-      // Refresh conversations for both
+    // Step 3: Refresh conversations list (non-critical)
+    try {
       const senderConversations = await this.conversationsService.findByUser(friendRequest.sender.id);
       const senderMapped = senderConversations.map((c) => ({
         id: c.id,
@@ -560,8 +607,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         createdAt: c.createdAt,
       }));
       client.emit('conversationsList', receiverMapped);
+    } catch (error) {
+      this.logger.error('acceptFriendRequest: Failed to refresh conversations (non-critical):', error);
+      // Continue - user still sees friend request accepted
+    }
 
-      // Update request list and pending count
+    // Step 4: Update friend requests list and pending count (non-critical)
+    try {
       const pendingRequests = await this.friendsService.getPendingRequests(userId);
       const mapped = pendingRequests.map((r) => ({
         id: r.id,
@@ -575,8 +627,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const pendingCount = await this.friendsService.getPendingRequestCount(userId);
       client.emit('pendingRequestsCount', { count: pendingCount });
+    } catch (error) {
+      this.logger.error('acceptFriendRequest: Failed to update friend requests list (non-critical):', error);
+      // Continue
+    }
 
-      // Emit updated friends lists to BOTH users
+    // Step 5: Emit updated friends lists (non-critical but important)
+    try {
       const senderFriends = await this.friendsService.getFriends(friendRequest.sender.id);
       this.logger.debug(`acceptFriendRequest: senderFriends count=${senderFriends.length}`);
       const senderFriendsPayload = senderFriends.map((f) => ({
@@ -600,8 +657,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Send to receiver (current user)
       client.emit('friendsList', receiverFriendsPayload);
+    } catch (error) {
+      this.logger.error('acceptFriendRequest: Failed to emit friends lists (non-critical):', error);
+      // Continue
+    }
 
-      // Emit openConversation to navigate both users to the chat
+    // Step 6: Emit openConversation event (non-critical)
+    try {
       if (conversation) {
         this.logger.debug(`acceptFriendRequest: emitting openConversation id=${conversation.id}`);
         client.emit('openConversation', { conversationId: conversation.id });
@@ -613,8 +675,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
       }
     } catch (error) {
-      this.logger.error('acceptFriendRequest ERROR:', error);
-      client.emit('error', { message: error.message });
+      this.logger.error('acceptFriendRequest: Failed to emit openConversation (non-critical):', error);
+      // No need to continue - this is the last step
     }
   }
 
@@ -718,30 +780,45 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    this.logger.debug(`handleUnfriend: currentUserId=${currentUserId}, targetUserId=${data.userId}`);
+
+    // Step 1: Delete the friend relationship (CRITICAL - if this fails, operation fails)
     try {
-      this.logger.debug(`handleUnfriend: currentUserId=${currentUserId}, targetUserId=${data.userId}`);
-
-      // Delete the friend relationship
       await this.friendsService.unfriend(currentUserId, data.userId);
+    } catch (error) {
+      this.logger.error('handleUnfriend: Failed to unfriend:', error);
+      client.emit('error', { message: error.message || 'Failed to unfriend user' });
+      return; // Critical failure - stop here
+    }
 
-      // Delete the conversation
+    // Step 2: Delete the conversation (important but not critical)
+    try {
       const conversation = await this.conversationsService.findByUsers(currentUserId, data.userId);
       if (conversation) {
         await this.conversationsService.delete(conversation.id);
         this.logger.debug(`handleUnfriend: deleted conversation id=${conversation.id}`);
       }
+    } catch (error) {
+      this.logger.error('handleUnfriend: Failed to delete conversation (non-critical):', error);
+      // Continue - users are unfriended even if conversation deletion failed
+    }
 
-      // Notify both users
+    const otherUserSocketId = this.onlineUsers.get(data.userId);
+
+    // Step 3: Notify both users (non-critical)
+    try {
       const notifyPayload = { userId: currentUserId };
-
       client.emit('unfriended', notifyPayload);
 
-      const otherUserSocketId = this.onlineUsers.get(data.userId);
       if (otherUserSocketId) {
         this.server.to(otherUserSocketId).emit('unfriended', { userId: currentUserId });
       }
+    } catch (error) {
+      this.logger.error('handleUnfriend: Failed to emit unfriended event (non-critical):', error);
+    }
 
-      // Refresh conversations for both
+    // Step 4: Refresh conversations for both users (non-critical)
+    try {
       const conversations = await this.conversationsService.findByUser(currentUserId);
       const mapped = conversations.map((c) => ({
         id: c.id,
@@ -761,8 +838,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }));
         this.server.to(otherUserSocketId).emit('conversationsList', otherMapped);
       }
+    } catch (error) {
+      this.logger.error('handleUnfriend: Failed to refresh conversations (non-critical):', error);
+    }
 
-      // Emit updated friends lists to BOTH users
+    // Step 5: Emit updated friends lists to both users (non-critical)
+    try {
       const currentUserFriends = await this.friendsService.getFriends(currentUserId);
       client.emit('friendsList', currentUserFriends.map(f => ({
         id: f.id, email: f.email, username: f.username,
@@ -777,8 +858,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.logger.debug(`handleUnfriend: emitted friendsList to otherUser, count=${otherUserFriends.length}`);
       }
     } catch (error) {
-      this.logger.error('handleUnfriend ERROR:', error);
-      client.emit('error', { message: error.message });
+      this.logger.error('handleUnfriend: Failed to emit friends lists (non-critical):', error);
     }
   }
 }

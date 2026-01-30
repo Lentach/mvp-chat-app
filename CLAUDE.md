@@ -286,13 +286,19 @@ if (records.length > 0) {
 - Added ChatProvider.loadMoreMessages() method for incremental loading
 - Messages now support pagination via WebSocket
 
+✅ **Issue #7: Individual Error Handling**
+- Refactored `handleAcceptFriendRequest()` with 6 separate try/catch blocks
+- Refactored `handleSendFriendRequest()` with individual error handling for auto-accept and pending flows
+- Refactored `handleUnfriend()` with 5 separate try/catch blocks
+- Critical operations (acceptRequest, sendRequest, unfriend) fail fast with error emit
+- Non-critical operations (emit events, refresh lists) continue on failure with error logging
+- Partial success now possible - users get some updates even if later operations fail
+- Improved error messages distinguish critical vs non-critical failures
+
 ### In Progress
 
 ⏳ **Issue #8: Split Gateway**
 - Break 750-line `chat.gateway.ts` into `ChatMessageService`, `ChatFriendRequestService`, `ChatConversationService`
-
-⏳ **Issue #7: Individual Error Handling**
-- Wrap operations separately, emit partial success
 
 ---
 
@@ -493,8 +499,7 @@ Commit: b9edc3b, docs: 02720c8
 - Clever reactive navigation pattern (`consumePendingOpen()`)
 
 **Current issues (lower priority):**
-- Chat gateway still large (750 lines, needs split into services)
-- Individual error handling (some multi-step handlers catch errors at end)
+- Chat gateway still large (750+ lines, needs split into services)
 - No test coverage (zero tests currently)
 - Magic numbers scattered (500ms delay, 600px breakpoint)
 - Could use database indexes on frequently-queried columns
