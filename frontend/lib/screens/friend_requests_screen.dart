@@ -11,6 +11,8 @@ class FriendRequestsScreen extends StatefulWidget {
 }
 
 class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
+  bool _navigatingToChat = false;
+
   @override
   void initState() {
     super.initState();
@@ -21,6 +23,19 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chat = context.watch<ChatProvider>();
+
+    // Listen for pending open conversation to navigate
+    final pendingId = chat.consumePendingOpen();
+    if (pendingId != null && !_navigatingToChat) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _navigatingToChat = true;
+          Navigator.of(context).pop(pendingId);
+        }
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -29,8 +44,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
         ),
       ),
       body: Consumer<ChatProvider>(
-        builder: (context, chat, _) {
-          if (chat.friendRequests.isEmpty) {
+        builder: (context, chatConsumer, _) {
+          if (chatConsumer.friendRequests.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -55,9 +70,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
 
           return ListView.builder(
             padding: const EdgeInsets.all(12),
-            itemCount: chat.friendRequests.length,
+            itemCount: chatConsumer.friendRequests.length,
             itemBuilder: (context, index) {
-              final request = chat.friendRequests[index];
+              final request = chatConsumer.friendRequests[index];
               final displayName = request.sender.username ?? request.sender.email;
               final firstLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
 

@@ -19,6 +19,7 @@ class ChatProvider extends ChangeNotifier {
   List<FriendRequestModel> _friendRequests = [];
   int _pendingRequestsCount = 0;
   List<UserModel> _friends = [];
+  bool _friendRequestJustSent = false;
 
   List<ConversationModel> get conversations => _conversations;
   List<MessageModel> get messages => _messages;
@@ -30,6 +31,7 @@ class ChatProvider extends ChangeNotifier {
   List<FriendRequestModel> get friendRequests => _friendRequests;
   int get pendingRequestsCount => _pendingRequestsCount;
   List<UserModel> get friends => _friends;
+  bool get friendRequestJustSent => _friendRequestJustSent;
 
   void clearError() {
     _errorMessage = null;
@@ -40,6 +42,12 @@ class ChatProvider extends ChangeNotifier {
     final id = _pendingOpenConversationId;
     _pendingOpenConversationId = null;
     return id;
+  }
+
+  bool consumeFriendRequestSent() {
+    final sent = _friendRequestJustSent;
+    _friendRequestJustSent = false;
+    return sent;
   }
 
   String getOtherUserEmail(ConversationModel conv) {
@@ -141,7 +149,9 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners();
       },
       onFriendRequestSent: (data) {
-        debugPrint('Friend request sent');
+        debugPrint('Friend request sent confirmed by server');
+        _friendRequestJustSent = true;
+        notifyListeners();
       },
       onFriendRequestAccepted: (data) {
         final request = FriendRequestModel.fromJson(data as Map<String, dynamic>);
@@ -171,6 +181,9 @@ class ChatProvider extends ChangeNotifier {
         final unfriendUserId = (data as Map<String, dynamic>)['userId'] as int;
         _conversations.removeWhere((c) =>
             c.userOne.id == unfriendUserId || c.userTwo.id == unfriendUserId);
+        _friends.removeWhere((f) => f.id == unfriendUserId);
+        _friendRequests.removeWhere((r) =>
+            r.sender.id == unfriendUserId || r.receiver.id == unfriendUserId);
         if (_activeConversationId != null) {
           final activeConv = _conversations.where((c) => c.id == _activeConversationId).firstOrNull;
           if (activeConv == null) {
@@ -270,6 +283,7 @@ class ChatProvider extends ChangeNotifier {
     _friendRequests = [];
     _pendingRequestsCount = 0;
     _friends = [];
+    _friendRequestJustSent = false;
     notifyListeners();
   }
 }

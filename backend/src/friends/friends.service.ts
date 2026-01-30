@@ -87,6 +87,7 @@ export class FriendsService {
 
       const updated = await this.friendRequestRepository.findOne({
         where: { id: newRequest.id },
+        relations: ['sender', 'receiver'],
       });
       return updated!;
     }
@@ -183,6 +184,7 @@ export class FriendsService {
         receiver: { id: userId },
         status: FriendRequestStatus.PENDING,
       },
+      relations: ['sender', 'receiver'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -199,6 +201,7 @@ export class FriendsService {
           status: FriendRequestStatus.ACCEPTED,
         },
       ],
+      relations: ['sender', 'receiver'],
     });
 
     const friendIds = new Set<number>();
@@ -222,20 +225,32 @@ export class FriendsService {
   }
 
   async unfriend(userId1: number, userId2: number): Promise<boolean> {
-    const result = await this.friendRequestRepository.delete([
-      {
-        sender: { id: userId1 },
-        receiver: { id: userId2 },
-        status: FriendRequestStatus.ACCEPTED,
-      },
-      {
-        sender: { id: userId2 },
-        receiver: { id: userId1 },
-        status: FriendRequestStatus.ACCEPTED,
-      },
-    ]);
+    // TypeORM .delete() does NOT support nested relation conditions (sender: { id })
+    // so we must find first, then remove by entity instance (uses primary key)
+    const friendships = await this.friendRequestRepository.find({
+      where: [
+        {
+          sender: { id: userId1 },
+          receiver: { id: userId2 },
+          status: FriendRequestStatus.ACCEPTED,
+        },
+        {
+          sender: { id: userId2 },
+          receiver: { id: userId1 },
+          status: FriendRequestStatus.ACCEPTED,
+        },
+      ],
+    });
 
-    return (result.affected ?? 0) > 0;
+    console.log(`unfriend: found ${friendships.length} ACCEPTED records between users ${userId1} and ${userId2}`);
+
+    if (friendships.length === 0) {
+      return false;
+    }
+
+    await this.friendRequestRepository.remove(friendships);
+    console.log(`unfriend: removed ${friendships.length} records`);
+    return true;
   }
 
   async getPendingRequestCount(userId: number): Promise<number> {

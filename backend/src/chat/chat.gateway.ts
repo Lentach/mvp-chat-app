@@ -229,6 +229,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // Delete a conversation (hard delete for both users)
+  // IMPORTANT: This also deletes the friend relationship to prevent "Already friends" bug
   @SubscribeMessage('deleteConversation')
   async handleDeleteConversation(
     @ConnectedSocket() client: Socket,
@@ -237,30 +238,83 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.user?.id;
     if (!userId) return;
 
-    const conversation = await this.conversationsService.findById(data.conversationId);
+    try {
+      const conversation = await this.conversationsService.findById(data.conversationId);
 
-    if (!conversation) {
-      client.emit('error', { message: 'Conversation not found' });
-      return;
+      if (!conversation) {
+        client.emit('error', { message: 'Conversation not found' });
+        return;
+      }
+
+      // Authorization check
+      if (conversation.userOne.id !== userId && conversation.userTwo.id !== userId) {
+        client.emit('error', { message: 'Unauthorized' });
+        return;
+      }
+
+      // Get the other user's ID
+      const otherUserId = conversation.userOne.id === userId
+        ? conversation.userTwo.id
+        : conversation.userOne.id;
+
+      console.log(`deleteConversation: userId=${userId}, otherUserId=${otherUserId}, conversationId=${data.conversationId}`);
+
+      // CRITICAL FIX: Delete the friend relationship first
+      // This prevents "Already friends" error when trying to send a new friend request later
+      const unfriendResult = await this.friendsService.unfriend(userId, otherUserId);
+      console.log(`deleteConversation: unfriend result=${unfriendResult}`);
+
+      // Then delete the conversation
+      await this.conversationsService.delete(data.conversationId);
+      console.log(`deleteConversation: conversation deleted`);
+
+      // Notify the other user
+      const otherUserSocketId = this.onlineUsers.get(otherUserId);
+      if (otherUserSocketId) {
+        this.server.to(otherUserSocketId).emit('unfriended', { userId });
+        console.log(`deleteConversation: notified other user`);
+      }
+
+      // Refresh conversations list for current user
+      const conversations = await this.conversationsService.findByUser(userId);
+      const mapped = conversations.map((c) => ({
+        id: c.id,
+        userOne: { id: c.userOne.id, email: c.userOne.email, username: c.userOne.username },
+        userTwo: { id: c.userTwo.id, email: c.userTwo.email, username: c.userTwo.username },
+        createdAt: c.createdAt,
+      }));
+      client.emit('conversationsList', mapped);
+
+      // Refresh conversations list for other user
+      if (otherUserSocketId) {
+        const otherConversations = await this.conversationsService.findByUser(otherUserId);
+        const otherMapped = otherConversations.map((c) => ({
+          id: c.id,
+          userOne: { id: c.userOne.id, email: c.userOne.email, username: c.userOne.username },
+          userTwo: { id: c.userTwo.id, email: c.userTwo.email, username: c.userTwo.username },
+          createdAt: c.createdAt,
+        }));
+        this.server.to(otherUserSocketId).emit('conversationsList', otherMapped);
+      }
+
+      // Refresh friends lists for both users
+      const currentUserFriends = await this.friendsService.getFriends(userId);
+      client.emit('friendsList', currentUserFriends.map(f => ({
+        id: f.id, email: f.email, username: f.username,
+      })));
+
+      if (otherUserSocketId) {
+        const otherUserFriends = await this.friendsService.getFriends(otherUserId);
+        this.server.to(otherUserSocketId).emit('friendsList', otherUserFriends.map(f => ({
+          id: f.id, email: f.email, username: f.username,
+        })));
+      }
+
+      console.log(`deleteConversation: all updates sent`);
+    } catch (error) {
+      console.error('deleteConversation ERROR:', error);
+      client.emit('error', { message: error.message });
     }
-
-    // Authorization check
-    if (conversation.userOne.id !== userId && conversation.userTwo.id !== userId) {
-      client.emit('error', { message: 'Unauthorized' });
-      return;
-    }
-
-    await this.conversationsService.delete(data.conversationId);
-
-    // Refresh list
-    const conversations = await this.conversationsService.findByUser(userId);
-    const mapped = conversations.map((c) => ({
-      id: c.id,
-      userOne: { id: c.userOne.id, email: c.userOne.email, username: c.userOne.username },
-      userTwo: { id: c.userTwo.id, email: c.userTwo.email, username: c.userTwo.username },
-      createdAt: c.createdAt,
-    }));
-    client.emit('conversationsList', mapped);
   }
 
   // Send a friend request by recipient email
@@ -281,7 +335,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
+      console.log(`sendFriendRequest: sender=${sender.email} (id=${sender.id}), recipient=${recipient.email} (id=${recipient.id})`);
       const friendRequest = await this.friendsService.sendRequest(sender, recipient);
+      console.log(`sendFriendRequest: created request id=${friendRequest.id}, status=${friendRequest.status}`);
 
       const payload = {
         id: friendRequest.id,
@@ -294,6 +350,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Check if it was auto-accepted (mutual request scenario)
       if (friendRequest.status === 'accepted') {
+        console.log(`Auto-accept: ${sender.email} <-> ${recipient.email}`);
+
         // It was auto-accepted! Emit acceptance events to both users
         client.emit('friendRequestAccepted', payload);
 
@@ -316,6 +374,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           })));
         }
 
+        // Create conversation between the two users
+        const conversation = await this.conversationsService.findOrCreate(sender, recipient);
+        console.log(`Auto-accept: conversation created/found id=${conversation.id}`);
+
         // Refresh conversations for both users
         const senderConversations = await this.conversationsService.findByUser(sender.id);
         const senderMapped = senderConversations.map((c) => ({
@@ -337,21 +399,42 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           }));
           this.server.to(recipientSocketId).emit('conversationsList', receiverMapped);
         }
+
+        // Emit openConversation for both users
+        client.emit('openConversation', { conversationId: conversation.id });
+
+        if (recipientSocketId) {
+          this.server.to(recipientSocketId).emit('openConversation', {
+            conversationId: conversation.id
+          });
+        }
+
+        // Update pending counts for both
+        const senderCount = await this.friendsService.getPendingRequestCount(sender.id);
+        client.emit('pendingRequestsCount', { count: senderCount });
+        if (recipientSocketId) {
+          const receiverCount = await this.friendsService.getPendingRequestCount(recipient.id);
+          this.server.to(recipientSocketId).emit('pendingRequestsCount', { count: receiverCount });
+        }
       } else {
         // Normal pending request flow
         // Notify sender
+        console.log(`sendFriendRequest: emitting friendRequestSent to sender ${sender.email}`);
         client.emit('friendRequestSent', payload);
 
         // Notify recipient if online
         const recipientSocketId = this.onlineUsers.get(recipient.id);
+        console.log(`sendFriendRequest: recipient ${recipient.email} (id=${recipient.id}) socketId=${recipientSocketId || 'OFFLINE'}`);
         if (recipientSocketId) {
           this.server.to(recipientSocketId).emit('newFriendRequest', payload);
           // Also send updated count
           const count = await this.friendsService.getPendingRequestCount(recipient.id);
           this.server.to(recipientSocketId).emit('pendingRequestsCount', { count });
+          console.log(`sendFriendRequest: emitted newFriendRequest + pendingRequestsCount(${count}) to recipient`);
         }
       }
     } catch (error) {
+      console.error(`sendFriendRequest ERROR: ${error.message}`);
       client.emit('error', { message: error.message });
     }
   }
@@ -366,7 +449,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!userId) return;
 
     try {
+      console.log(`acceptFriendRequest: requestId=${data.requestId}, userId=${userId}`);
       const friendRequest = await this.friendsService.acceptRequest(data.requestId, userId);
+      console.log(`acceptFriendRequest: accepted, sender=${friendRequest.sender.id} (${friendRequest.sender.email}), receiver=${friendRequest.receiver.id} (${friendRequest.receiver.email})`);
 
       const payload = {
         id: friendRequest.id,
@@ -383,6 +468,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const senderSocketId = this.onlineUsers.get(friendRequest.sender.id);
       if (senderSocketId) {
         this.server.to(senderSocketId).emit('friendRequestAccepted', payload);
+      }
+
+      // Create conversation between the two users so they appear on each other's lists
+      const senderUser = await this.usersService.findById(friendRequest.sender.id);
+      const receiverUser = await this.usersService.findById(friendRequest.receiver.id);
+      let conversation: any = null;
+      if (senderUser && receiverUser) {
+        conversation = await this.conversationsService.findOrCreate(senderUser, receiverUser);
+        console.log(`acceptFriendRequest: conversation id=${conversation.id}`);
       }
 
       // Refresh conversations for both
@@ -407,7 +501,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }));
       client.emit('conversationsList', receiverMapped);
 
-      // Update request list
+      // Update request list and pending count
       const pendingRequests = await this.friendsService.getPendingRequests(userId);
       const mapped = pendingRequests.map((r) => ({
         id: r.id,
@@ -419,8 +513,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }));
       client.emit('friendRequestsList', mapped);
 
+      const pendingCount = await this.friendsService.getPendingRequestCount(userId);
+      client.emit('pendingRequestsCount', { count: pendingCount });
+
       // Emit updated friends lists to BOTH users
       const senderFriends = await this.friendsService.getFriends(friendRequest.sender.id);
+      console.log(`acceptFriendRequest: senderFriends count=${senderFriends.length}`);
       const senderFriendsPayload = senderFriends.map((f) => ({
         id: f.id,
         email: f.email,
@@ -428,6 +526,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }));
 
       const receiverFriends = await this.friendsService.getFriends(userId);
+      console.log(`acceptFriendRequest: receiverFriends count=${receiverFriends.length}`);
       const receiverFriendsPayload = receiverFriends.map((f) => ({
         id: f.id,
         email: f.email,
@@ -441,7 +540,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Send to receiver (current user)
       client.emit('friendsList', receiverFriendsPayload);
+
+      // Emit openConversation to navigate both users to the chat
+      if (conversation) {
+        console.log(`acceptFriendRequest: emitting openConversation id=${conversation.id}`);
+        client.emit('openConversation', { conversationId: conversation.id });
+
+        if (senderSocketId) {
+          this.server.to(senderSocketId).emit('openConversation', {
+            conversationId: conversation.id
+          });
+        }
+      }
     } catch (error) {
+      console.error('acceptFriendRequest ERROR:', error);
       client.emit('error', { message: error.message });
     }
   }
@@ -546,6 +658,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!currentUserId) return;
 
     try {
+      console.log(`handleUnfriend: currentUserId=${currentUserId}, targetUserId=${data.userId}`);
+
       // Delete the friend relationship
       await this.friendsService.unfriend(currentUserId, data.userId);
 
@@ -553,6 +667,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const conversation = await this.conversationsService.findByUsers(currentUserId, data.userId);
       if (conversation) {
         await this.conversationsService.delete(conversation.id);
+        console.log(`handleUnfriend: deleted conversation id=${conversation.id}`);
       }
 
       // Notify both users
@@ -585,7 +700,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }));
         this.server.to(otherUserSocketId).emit('conversationsList', otherMapped);
       }
+
+      // Emit updated friends lists to BOTH users
+      const currentUserFriends = await this.friendsService.getFriends(currentUserId);
+      client.emit('friendsList', currentUserFriends.map(f => ({
+        id: f.id, email: f.email, username: f.username,
+      })));
+      console.log(`handleUnfriend: emitted friendsList to currentUser, count=${currentUserFriends.length}`);
+
+      if (otherUserSocketId) {
+        const otherUserFriends = await this.friendsService.getFriends(data.userId);
+        this.server.to(otherUserSocketId).emit('friendsList', otherUserFriends.map(f => ({
+          id: f.id, email: f.email, username: f.username,
+        })));
+        console.log(`handleUnfriend: emitted friendsList to otherUser, count=${otherUserFriends.length}`);
+      }
     } catch (error) {
+      console.error('handleUnfriend ERROR:', error);
       client.emit('error', { message: error.message });
     }
   }

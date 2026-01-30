@@ -61,10 +61,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     );
   }
 
-  void _openFriendRequests() {
-    Navigator.of(context).push(
+  void _openFriendRequests() async {
+    final result = await Navigator.of(context).push<int>(
       MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
     );
+    if (result != null && mounted) {
+      _openChat(result);
+    }
   }
 
   void _deleteConversation(int conversationId) {

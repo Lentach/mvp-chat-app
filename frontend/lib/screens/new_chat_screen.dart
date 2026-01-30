@@ -13,6 +13,7 @@ class NewChatScreen extends StatefulWidget {
 class _NewChatScreenState extends State<NewChatScreen> {
   final _emailController = TextEditingController();
   bool _loading = false;
+  bool _requestSent = false;
 
   @override
   void dispose() {
@@ -24,33 +25,42 @@ class _NewChatScreenState extends State<NewChatScreen> {
     final email = _emailController.text.trim();
     if (email.isEmpty) return;
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _requestSent = false;
+    });
     context.read<ChatProvider>().clearError();
     context.read<ChatProvider>().sendFriendRequest(email);
-
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Friend request sent to $email'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context);
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<ChatProvider>();
 
-    // Listen for pending open conversation to navigate
+    // Listen for pending open conversation to navigate (mutual auto-accept)
     final pendingId = chat.consumePendingOpen();
     if (pendingId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.of(context).pop(pendingId);
+        }
+      });
+    }
+
+    // Listen for server confirmation that friend request was sent
+    if (chat.consumeFriendRequestSent() && _loading && !_requestSent) {
+      _requestSent = true;
+      _loading = false;
+      final email = _emailController.text.trim();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Friend request sent to $email'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
         }
       });
     }
