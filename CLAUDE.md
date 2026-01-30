@@ -417,6 +417,269 @@ Users were calling `deleteConversation` (the obvious "delete chat" action), not 
 - Confirmed `ConversationsService.delete()` already deletes messages explicitly
 - Confirmed `ChatGateway.handleUnfriend()` properly orchestrates deletion + events
 
+## Code Review Findings (2026-01-30)
+
+### Overall Assessment
+- **Code Quality: 7/10** — Solid architecture, good module separation, but missing defensive practices
+- **Production Readiness: 5/10** — MVP stage, security hardening needed before public release
+- **Maintainability: 7/10** — Mostly readable, good structure, some duplication and missing documentation
+
+### STRENGTHS ✅
+
+**Backend**
+- Clean NestJS module structure (Auth, Users, Friends, Chat, Conversations, Messages)
+- Bcrypt with 10 rounds (good security/performance balance)
+- JWT token verification on WebSocket connection
+- Correct use of `relations: ['sender', 'receiver']` in all service queries
+- Understanding of TypeORM `.delete()` limitations (find-then-remove pattern)
+- Comprehensive WebSocket event coverage (14+ handlers)
+
+**Frontend**
+- Clean Provider pattern with ChangeNotifier (two focused providers: Auth, Chat)
+- Responsive design (master-detail on desktop >=600px, stacked navigation on mobile)
+- Reactive navigation with `consumePendingOpen()` pattern
+- Coherent RPG theme system (Press Start 2P + Inter fonts)
+- Proper async handling with Navigator.push<T>() return values
+- Graceful error handling and disconnection
+
+**Database & Architecture**
+- Pragmatic schema design with proper foreign keys and cascading deletes
+- Type-safe TypeORM entities
+- Monolithic backend with clear separation of concerns
+
+### CRITICAL ISSUES 🔴 (Fix before production)
+
+#### 1. CORS set to '*'
+```typescript
+@WebSocketGateway({ cors: { origin: '*' } })
+```
+**Impact:** Production security risk. Allows any website to connect.
+**Fix:** Use environment config with specific origins:
+```typescript
+@WebSocketGateway({
+  cors: { origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'] }
+})
+```
+
+#### 2. No input validation for WebSocket messages
+**Impact:** Invalid data reaches database unchecked.
+**Fix:** Create DTOs with validation decorators:
+```typescript
+class SendMessageDto {
+  @IsNumber()
+  @IsPositive()
+  recipientId: number;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(5000)
+  content: string;
+}
+```
+
+#### 3. Weak password validation (min 6 chars only)
+**Impact:** Easy to brute force, accounts not properly secured.
+**Fix:** Enforce min 8 chars, uppercase + lowercase + number requirement.
+
+#### 4. No rate limiting on auth/WebSocket events
+**Impact:** Brute force attacks on login, WebSocket spam attacks possible.
+**Fix:** Add @nestjs/throttler package:
+```bash
+npm install @nestjs/throttler
+```
+
+#### 5. Environment variable validation missing
+**Impact:** App starts even if critical config missing (DB_HOST, JWT_SECRET).
+**Fix:** Validate all required env vars on startup using class-validator.
+
+### HIGH PRIORITY ISSUES 🟠 (Do soon)
+
+#### 6. console.log instead of NestJS Logger
+**Problem:** 100+ console.log calls throughout chat.gateway.ts. No log levels, not production-suitable.
+**Fix:** Replace with NestJS Logger:
+```typescript
+import { Logger } from '@nestjs/common';
+private readonly logger = new Logger(ChatGateway.name);
+this.logger.debug(`deleteConversation: userId=${userId}`);
+```
+
+#### 7. Single try/catch blocks mask errors
+**Example:** handleSendFriendRequest (lines 337-440) — if ANY step fails, all subsequent emits are skipped.
+**Problem:** Hard to debug, users get silent failures.
+**Fix:** Wrap individual operations separately, emit partial success where possible.
+
+#### 8. chat.gateway.ts is too large (723 lines)
+**Problem:** 14+ handlers in one file, hard to navigate and test.
+**Fix:** Extract into service classes:
+- ChatMessageService
+- ChatFriendRequestService
+- ChatConversationService
+
+#### 9. Repetitive mapping code
+**Problem:** Same conversation/user mapping appears 10+ times in gateway.
+**Example:**
+```typescript
+const mapped = conversations.map((c) => ({
+  id: c.id,
+  userOne: { id: c.userOne.id, email: c.userOne.email, username: c.userOne.username },
+  userTwo: { id: c.userTwo.id, email: c.userTwo.email, username: c.userTwo.username },
+  createdAt: c.createdAt,
+}));
+```
+**Fix:** Create mapper helpers:
+```typescript
+class ConversationMapper {
+  static toPayload(conversation: Conversation) {
+    return {
+      id: conversation.id,
+      userOne: UserMapper.toPayload(conversation.userOne),
+      userTwo: UserMapper.toPayload(conversation.userTwo),
+      createdAt: conversation.createdAt,
+    };
+  }
+}
+```
+
+#### 10. No pagination for messages
+**Problem:** Always loads hardcoded last 50 messages, no offset/limit support.
+**Current:** `findByConversation(conversationId)`
+**Fix:** Add pagination parameters:
+```typescript
+async findByConversation(
+  conversationId: number,
+  limit: number = 50,
+  offset: number = 0,
+): Promise<Message[]>
+```
+
+### MEDIUM PRIORITY ISSUES 🟡 (Nice to have)
+
+#### 11-15. Performance & Code Quality Issues
+
+**11. Magic numbers scattered throughout**
+- 500ms retry delay (flutter)
+- 50 messages limit (hardcoded)
+- 5000 char message limit (not enforced)
+- 600px breakpoint (responsive design)
+
+**Fix:** Extract to `constants/app.constants.ts`
+
+**12. Multiple sequential database queries**
+- Example: acceptFriendRequest queries getFriends() twice sequentially
+- Fix: Use `Promise.all()` to parallelize independent queries
+
+**13. No database indexes on frequently-queried columns**
+- Add indexes on friend_requests (receiver_id, status)
+- Add indexes on messages (conversation_id, createdAt)
+
+**14. No WebSocket message size limits**
+- User could send 100KB message unchecked
+- Fix: Add @MaxLength(5000) validation
+
+**15. Missing null safety in Dart**
+- Example: `_conversations.firstWhere(...)` throws if not found
+- Fix: Use `firstWhereOrNull()` with null checks
+
+#### 16-20. Testing, Documentation & Features
+
+**16. No test coverage**
+- Currently: Only manual test scripts
+- Missing: Unit tests, integration tests, E2E tests
+- Target: >60% coverage minimum
+
+**17. Missing JSDoc documentation**
+- Complex methods lack documentation (especially chat.gateway.ts)
+- Add JSDoc comments explaining payloads, side effects, auth requirements
+
+**18. No WebSocket reconnection logic**
+- If connection drops, app doesn't auto-reconnect
+- Implement exponential backoff reconnection in SocketService
+
+**19. Inconsistent error messages**
+- Client receives raw error messages from server
+- Use error codes (ERR_NOT_FOUND, ERR_UNAUTHORIZED) + user-friendly messages
+
+**20. No structured logging**
+- Logs are unstructured strings, hard to parse in production
+- Use JSON logging with context (requestId, userId, operation)
+
+### SECURITY ASSESSMENT TABLE
+
+| Issue | Severity | Status | Fix |
+|-------|----------|--------|-----|
+| CORS: '*' | HIGH | ⚠️ Critical | Use environment config |
+| No input validation (WebSocket) | HIGH | ⚠️ Critical | Add DTOs + ValidationPipe |
+| Weak password validation | MEDIUM | ⚠️ Important | Min 8 chars + uppercase + number |
+| No rate limiting | MEDIUM | ⚠️ Important | @nestjs/throttler |
+| Env var validation | MEDIUM | ⚠️ Important | Validate on startup |
+| JWT in query param | LOW | ✅ Acceptable | OK for MVP (note for later) |
+
+### PERFORMANCE OPPORTUNITIES
+
+- [ ] Add database indexes on frequently-queried columns
+- [ ] Parallelize independent queries with Promise.all()
+- [ ] Implement message pagination (currently hardcoded 50)
+- [ ] Add response caching (conversations list, friends list)
+- [ ] Optimize N+1 queries in conversation/message loading
+- [ ] Consider connection pooling for PostgreSQL
+
+### TESTING GAPS
+
+**Currently missing:**
+- ❌ Unit tests for FriendsService
+- ❌ Unit tests for AuthService
+- ❌ Unit tests for MessagesService
+- ❌ Integration tests for WebSocket flows
+- ❌ E2E tests for full user journeys
+- ❌ Load testing for concurrent connections
+
+**Target coverage:**
+- Services: >80% (FriendsService, AuthService, ConversationsService)
+- Gateway: >70% (main handlers, error paths)
+- Controllers: >80% (auth endpoints)
+- Overall: >60% minimum
+
+### TECHNICAL DEBT PRIORITY
+
+| Item | Impact | Effort | Priority |
+|------|--------|--------|----------|
+| Fix CORS | High | 5 min | 🔴 |
+| Add rate limiting | High | 30 min | 🔴 |
+| WebSocket input validation | High | 2h | 🔴 |
+| Replace console.log with Logger | Medium | 1h | 🔴 |
+| Split chat.gateway.ts | High | 3-4h | 🟠 |
+| Unit tests (FriendsService) | High | 4-6h | 🟠 |
+| Add message pagination | Medium | 2h | 🟠 |
+| Extract magic numbers | Low | 1h | 🟡 |
+| Parallelize queries | Medium | 2h | 🟡 |
+| Add database indexes | Low | 1h | 🟡 |
+| WebSocket reconnection | Medium | 3h | 🟡 |
+| JSDoc documentation | Low | 2h | 🟡 |
+
+### RECOMMENDED NEXT STEPS (by order)
+
+1. **Fix CORS** (5 min) — Use environment config with specific origins
+2. **Add rate limiting** (30 min) — @nestjs/throttler on auth and WebSocket
+3. **Add input validation** (2h) — WebSocket DTOs with validation
+4. **Replace Logger** (1h) — Replace all console.log with NestJS Logger
+5. **Unit tests** (4-6h) — Start with FriendsService (most critical)
+6. **Split chat.gateway.ts** (3-4h) — Extract to service classes
+7. **Add pagination** (2h) — Messages endpoint with limit/offset
+8. **Parallelize queries** (2h) — Use Promise.all() in handlers
+
+### POSITIVE NOTES 👍
+
+The application demonstrates:
+- Good understanding of NestJS patterns and TypeORM
+- Solid state management principles in Flutter
+- Thoughtful error recovery (e.g., find-then-remove pattern)
+- Clear module separation of concerns
+- Responsive design implementation
+- Comprehensive WebSocket event coverage
+- Problem-solving mindset (documented gotchas in CLAUDE.md)
+
+The codebase is production-ready for MVP stage, but requires security hardening and testing before scaling to public release.
+
 ### 2026-01-30 (Round 3): Auto-Open Chat + Relations Fix
 
 **Problem:** After accepting a friend request, users were not added as friends and the chat window did not open. The entire accept flow was silently failing.
@@ -447,3 +710,188 @@ Users were calling `deleteConversation` (the obvious "delete chat" action), not 
 3. Mutual auto-accept not emitting events -- added status check + emit acceptance events
 4. Frontend not requesting friends list update -- added `_socketService.getFriends()` in `onFriendRequestAccepted`
 5. Missing relations in `rejectRequest()` -- consistency fix
+
+## Code Review Findings (2026-01-30)
+
+### Overall Assessment
+- **Code Quality: 7/10** — Solid architecture, good module separation, but missing defensive practices
+- **Production Readiness: 5/10** — MVP stage, security hardening needed before public release
+- **Maintainability: 7/10** — Mostly readable, good structure, some duplication and missing documentation
+
+### STRENGTHS ✅
+- **Backend architecture** — Clean NestJS module structure (Auth, Users, Friends, Chat, Conversations, Messages)
+- **Security practices** — Bcrypt with 10 rounds, JWT validation, proper authorization checks
+- **TypeORM relations** — Correct use of `relations: ['sender', 'receiver']` in queries
+- **Find-then-remove pattern** — Understanding of TypeORM `.delete()` limitations
+- **Frontend state management** — Clean Provider pattern with two focused providers
+- **Responsive design** — Master-detail layout (desktop), stacked navigation (mobile)
+- **WebSocket architecture** — 14+ comprehensive event handlers covering all functionality
+- **Reactive navigation** — Clever `consumePendingOpen()` pattern for backend-initiated navigation
+
+### CRITICAL ISSUES 🔴 (Fix before production)
+
+#### 1. CORS set to '*'
+```typescript
+@WebSocketGateway({ cors: { origin: '*' } })
+```
+**Impact:** Production security risk. Allows any website to connect.
+**Fix:** Use specific allowed origins from environment variables.
+
+#### 2. No input validation for WebSocket messages
+**Impact:** Invalid data can reach database unchecked.
+**Fix:** Create DTOs with validation decorators (IsNumber, IsString, MaxLength, etc.) and validate manually in handlers or use NestJS guards for WebSocket.
+
+#### 3. Weak password validation (min 6 chars only)
+**Impact:** Easy to brute force, accounts not properly secured.
+**Fix:** Enforce min 8 chars, uppercase + lowercase + number, consider password blacklist.
+
+#### 4. No rate limiting on auth/WebSocket events
+**Impact:** Brute force attacks possible on login, WebSocket spam attacks possible.
+**Fix:** Add @nestjs/throttler package, apply limits to POST /auth/login and WebSocket event handlers.
+
+#### 5. Environment variable validation missing
+**Impact:** App starts even if critical config is missing (DB_HOST, JWT_SECRET).
+**Fix:** Validate all required env vars on startup using class-validator.
+
+### HIGH PRIORITY ISSUES 🟠 (Do soon)
+
+#### 6. console.log instead of NestJS Logger
+**Problem:** 100+ console.log calls throughout chat.gateway.ts. No log levels, not suitable for production monitoring.
+**Fix:** Use `private readonly logger = new Logger(ClassName.name)` from '@nestjs/common'.
+
+#### 7. Single try/catch blocks mask errors
+**Example:** handleSendFriendRequest (lines 337-440) — if ANY step fails, all subsequent emits are skipped.
+**Problem:** Hard to debug, users get silent failures.
+**Fix:** Wrap individual operations separately, emit partial success where possible.
+
+#### 8. chat.gateway.ts is too large (723 lines)
+**Problem:** 14+ handlers in one file, hard to navigate and test.
+**Fix:** Extract into service classes:
+- ChatMessageService
+- ChatFriendRequestService
+- ChatConversationService
+
+#### 9. Repetitive mapping code
+**Problem:** Same conversation/user/friendRequest mapping appears 10+ times in gateway.
+**Fix:** Create mapper helpers (ConversationMapper.toPayload(), UserMapper.toPayload()).
+
+#### 10. No pagination for messages
+**Problem:** Always loads hardcoded last 50 messages, no offset/limit support.
+**Fix:** Add pagination parameters to messages.service.ts findByConversation().
+
+### MEDIUM PRIORITY ISSUES 🟡 (Nice to have)
+
+#### 11. Magic numbers scattered throughout
+- 500ms retry delay (flutter)
+- 50 messages limit (hardcoded)
+- 5000 char message limit (not enforced)
+
+**Fix:** Extract to `constants/app.constants.ts`
+
+#### 12. Multiple sequential database queries
+**Example:** acceptFriendRequest handler queries getFriends() twice sequentially.
+**Fix:** Use `Promise.all()` to parallelize independent queries.
+
+#### 13. No database indexes on frequently-queried columns
+**Fix:** Add indexes on friend_requests (receiver_id, status) and messages (conversation_id, createdAt).
+
+#### 14. No WebSocket message size limits
+**Problem:** User could send 100KB message unchecked.
+**Fix:** Add @MaxLength(5000) validation, implement server-side checks.
+
+#### 15. Missing null safety in Dart
+**Example:** `_conversations.firstWhere(...)` throws if not found.
+**Fix:** Use `firstWhereOrNull()` and check for null before using.
+
+#### 16. No test coverage
+**Current:** Only manual test scripts, no automated tests.
+**Fix:** Add Jest unit tests for services, e2e tests for WebSocket flows, target >60% coverage.
+
+#### 17. Missing JSDoc documentation
+**Problem:** Complex methods lack documentation (especially in chat.gateway.ts).
+**Fix:** Add JSDoc comments explaining payloads, side effects, auth requirements.
+
+#### 18. No WebSocket reconnection logic
+**Problem:** If connection drops, app doesn't auto-reconnect.
+**Fix:** Implement exponential backoff reconnection in SocketService.
+
+#### 19. Inconsistent error messages
+**Problem:** Client receives raw error messages from server.
+**Fix:** Use error codes (ERR_NOT_FOUND, ERR_UNAUTHORIZED) + user-friendly messages.
+
+#### 20. No structured logging
+**Problem:** Logs are unstructured strings, hard to parse in production.
+**Fix:** Use JSON logging with context (requestId, userId, operation).
+
+### SECURITY RECOMMENDATIONS
+
+| Issue | Severity | Fix |
+|-------|----------|-----|
+| CORS: '*' | HIGH | Use environment config |
+| No input validation | MEDIUM | Add DTOs + validation |
+| Weak password rules | MEDIUM | Enforce 8+ chars, uppercase/number |
+| No rate limiting | MEDIUM | Add @nestjs/throttler |
+| Env var validation | LOW | Validate on startup |
+| JWT in query param | LOW | Acceptable for MVP (note for later) |
+| No HTTPS | N/A | Only applies to deployment |
+
+### PERFORMANCE OPPORTUNITIES
+
+- [ ] Add database indexes on frequently-queried columns
+- [ ] Parallelize independent queries with Promise.all()
+- [ ] Implement message pagination (currently hardcoded 50)
+- [ ] Add response caching where appropriate (conversations list, friends list)
+- [ ] Consider connection pooling for PostgreSQL
+- [ ] Optimize N+1 queries in conversation/message loading
+
+### TESTING GAPS
+
+**Currently missing:**
+- ❌ Unit tests for FriendsService
+- ❌ Unit tests for AuthService
+- ❌ Integration tests for WebSocket flows
+- ❌ E2E tests for full user journeys
+- ❌ Load testing for concurrent connections
+
+**Recommended coverage:**
+- [ ] Services: >80% (FriendsService, AuthService, ConversationsService)
+- [ ] Gateway: >70% (main handlers, error paths)
+- [ ] Controllers: >80% (auth endpoints)
+- [ ] Overall: >60% minimum
+
+### TECHNICAL DEBT
+
+| Item | Impact | Effort | Priority |
+|------|--------|--------|----------|
+| Split chat.gateway.ts | High | Medium | HIGH |
+| Extract mappers | Medium | Low | MEDIUM |
+| Replace console.log | Medium | Low | HIGH |
+| Add validation | High | Medium | CRITICAL |
+| Add tests | High | High | HIGH |
+| Add rate limiting | High | Low | CRITICAL |
+| Database indexes | Medium | Low | MEDIUM |
+| Message pagination | Medium | Medium | MEDIUM |
+
+### RECOMMENDED NEXT STEPS (by order)
+
+1. **Fix CORS** (5 min) — Use environment config with specific origins
+2. **Add rate limiting** (30 min) — @nestjs/throttler on auth and WebSocket
+3. **Add DTOs + validation** (2 hours) — Create validation classes, validate in handlers
+4. **Replace Logger** (1 hour) — Replace all console.log with NestJS Logger
+5. **Unit tests** (4-6 hours) — Start with FriendsService (most critical)
+6. **Split chat.gateway.ts** (3-4 hours) — Extract to service classes
+7. **Add pagination** (2 hours) — Messages endpoint with limit/offset
+8. **Extract constants** (1 hour) — Remove magic numbers
+
+### Positive Notes 👍
+
+The application demonstrates:
+- Good understanding of NestJS patterns
+- Proper use of TypeORM relationships
+- Solid state management in Flutter
+- Thoughtful error recovery (e.g., find-then-remove pattern)
+- Clear module separation of concerns
+- Responsive design implementation
+- Comprehensive WebSocket event coverage
+
+The codebase is production-ready for MVP stage, but requires security hardening before scaling to public release.

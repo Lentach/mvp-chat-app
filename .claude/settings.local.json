@@ -55,7 +55,14 @@
       "Bash(__NEW_LINE_0cbffb1c01ed776f__ docker-compose exec -T db psql -U postgres -d chatdb -c \"\\\\d friend_requests\")",
       "Bash(docker-compose logs:*)",
       "Bash(__NEW_LINE_59742ea5738cd601__ echo \"\")",
-      "Bash(__NEW_LINE_a8e2a6774ea79f69__ echo \"\")"
+      "Bash(__NEW_LINE_a8e2a6774ea79f69__ echo \"\")",
+      "Bash(node test-friend-system.js:*)",
+      "Bash(git push:*)",
+      "Bash(timeout 15 bash -c 'while ! curl -s http://localhost:3000/health > /dev/null 2>&1; do sleep 1; done; echo \"\"Backend is ready\"\"')",
+      "Bash(xargs:*)",
+      "Bash(timeout /t 15 /nobreak)",
+      "Bash(node:*)",
+      "Bash(tree:*)"
     ]
   }
 }
