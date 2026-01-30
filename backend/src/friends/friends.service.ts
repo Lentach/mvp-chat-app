@@ -100,6 +100,7 @@ export class FriendsService {
   ): Promise<FriendRequest> {
     const request = await this.friendRequestRepository.findOne({
       where: { id: requestId },
+      relations: ['sender', 'receiver'],
     });
 
     if (!request) {
@@ -120,6 +121,7 @@ export class FriendsService {
 
     const updated = await this.friendRequestRepository.findOne({
       where: { id: requestId },
+      relations: ['sender', 'receiver'],
     });
     return updated!;
   }
@@ -130,6 +132,7 @@ export class FriendsService {
   ): Promise<FriendRequest> {
     const request = await this.friendRequestRepository.findOne({
       where: { id: requestId },
+      relations: ['sender', 'receiver'],
     });
 
     if (!request) {
@@ -150,6 +153,7 @@ export class FriendsService {
 
     const updated = await this.friendRequestRepository.findOne({
       where: { id: requestId },
+      relations: ['sender', 'receiver'],
     });
     return updated!;
   }

@@ -15,8 +15,8 @@ services:
   # NestJS backend
   backend:
     build: ./backend
-    expose:
-      - '3000'
+    ports:
+      - '3000:3000'
     environment:
       DB_HOST: db
       DB_PORT: '5432'

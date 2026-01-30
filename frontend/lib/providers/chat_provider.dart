@@ -147,6 +147,7 @@ class ChatProvider extends ChangeNotifier {
         final request = FriendRequestModel.fromJson(data as Map<String, dynamic>);
         _friendRequests.removeWhere((r) => r.id == request.id);
         _socketService.getConversations();
+        _socketService.getFriends();
         notifyListeners();
       },
       onFriendRequestRejected: (data) {

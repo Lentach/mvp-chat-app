@@ -292,16 +292,64 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         respondedAt: friendRequest.respondedAt,
       };
 
-      // Notify sender
-      client.emit('friendRequestSent', payload);
+      // Check if it was auto-accepted (mutual request scenario)
+      if (friendRequest.status === 'accepted') {
+        // It was auto-accepted! Emit acceptance events to both users
+        client.emit('friendRequestAccepted', payload);
 
-      // Notify recipient if online
-      const recipientSocketId = this.onlineUsers.get(recipient.id);
-      if (recipientSocketId) {
-        this.server.to(recipientSocketId).emit('newFriendRequest', payload);
-        // Also send updated count
-        const count = await this.friendsService.getPendingRequestCount(recipient.id);
-        this.server.to(recipientSocketId).emit('pendingRequestsCount', { count });
+        const recipientSocketId = this.onlineUsers.get(recipient.id);
+        if (recipientSocketId) {
+          this.server.to(recipientSocketId).emit('friendRequestAccepted', payload);
+        }
+
+        // Emit updated friends lists to both
+        const senderFriends = await this.friendsService.getFriends(sender.id);
+        const receiverFriends = await this.friendsService.getFriends(recipient.id);
+
+        client.emit('friendsList', senderFriends.map(f => ({
+          id: f.id, email: f.email, username: f.username
+        })));
+
+        if (recipientSocketId) {
+          this.server.to(recipientSocketId).emit('friendsList', receiverFriends.map(f => ({
+            id: f.id, email: f.email, username: f.username
+          })));
+        }
+
+        // Refresh conversations for both users
+        const senderConversations = await this.conversationsService.findByUser(sender.id);
+        const senderMapped = senderConversations.map((c) => ({
+          id: c.id,
+          userOne: { id: c.userOne.id, email: c.userOne.email, username: c.userOne.username },
+          userTwo: { id: c.userTwo.id, email: c.userTwo.email, username: c.userTwo.username },
+          createdAt: c.createdAt,
+        }));
+
+        client.emit('conversationsList', senderMapped);
+
+        if (recipientSocketId) {
+          const receiverConversations = await this.conversationsService.findByUser(recipient.id);
+          const receiverMapped = receiverConversations.map((c) => ({
+            id: c.id,
+            userOne: { id: c.userOne.id, email: c.userOne.email, username: c.userOne.username },
+            userTwo: { id: c.userTwo.id, email: c.userTwo.email, username: c.userTwo.username },
+            createdAt: c.createdAt,
+          }));
+          this.server.to(recipientSocketId).emit('conversationsList', receiverMapped);
+        }
+      } else {
+        // Normal pending request flow
+        // Notify sender
+        client.emit('friendRequestSent', payload);
+
+        // Notify recipient if online
+        const recipientSocketId = this.onlineUsers.get(recipient.id);
+        if (recipientSocketId) {
+          this.server.to(recipientSocketId).emit('newFriendRequest', payload);
+          // Also send updated count
+          const count = await this.friendsService.getPendingRequestCount(recipient.id);
+          this.server.to(recipientSocketId).emit('pendingRequestsCount', { count });
+        }
       }
     } catch (error) {
       client.emit('error', { message: error.message });
@@ -370,6 +418,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         respondedAt: r.respondedAt,
       }));
       client.emit('friendRequestsList', mapped);
+
+      // Emit updated friends lists to BOTH users
+      const senderFriends = await this.friendsService.getFriends(friendRequest.sender.id);
+      const senderFriendsPayload = senderFriends.map((f) => ({
+        id: f.id,
+        email: f.email,
+        username: f.username,
+      }));
+
+      const receiverFriends = await this.friendsService.getFriends(userId);
+      const receiverFriendsPayload = receiverFriends.map((f) => ({
+        id: f.id,
+        email: f.email,
+        username: f.username,
+      }));
+
+      // Send to sender (if online)
+      if (senderSocketId) {
+        this.server.to(senderSocketId).emit('friendsList', senderFriendsPayload);
+      }
+
+      // Send to receiver (current user)
+      client.emit('friendsList', receiverFriendsPayload);
     } catch (error) {
       client.emit('error', { message: error.message });
     }

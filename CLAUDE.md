@@ -310,6 +310,54 @@ main.dart → AuthGate (watches AuthProvider.isLoggedIn)
 - `shared_preferences ^2.3.4` — token persistence
 - `google_fonts ^6.2.1` — Press Start 2P + Inter fonts
 
+## Bug Fixes (2026-01-30)
+
+### Fixed: Friend Requests System - Critical Issues
+
+**5 critical bugs in the friend requests system were fixed and tested:**
+
+1. **Missing Relations in acceptRequest()** — `backend/src/friends/friends.service.ts`
+   - Added `relations: ['sender', 'receiver']` to TypeORM queries in acceptRequest() and rejectRequest()
+   - **Issue**: getFriends() was receiving empty User objects instead of full data, resulting in empty friends lists
+   - **Fix**: Ensure User relations are eagerly loaded from database
+   - **Impact**: ✅ Friends lists now populate correctly after accepting friend requests
+
+2. **Missing friendsList Events in acceptFriendRequest()** — `backend/src/chat/chat.gateway.ts`
+   - Added `getFriends()` service calls and `friendsList` event emissions after line 372
+   - **Issue**: After accepting a friend request, users never received their updated friends lists
+   - **Fix**: Emit `friendsList` event to both sender and receiver with full friend data
+   - **Impact**: ✅ Friends lists update in real-time without page refresh
+
+3. **Mutual Requests Auto-Accept Not Emitting Events** — `backend/src/chat/chat.gateway.ts`
+   - Added mutual request detection and proper event emissions in handleSendFriendRequest()
+   - **Issue**: When User B sends request to User A (who already sent to B), requests auto-accept but events don't emit
+   - **Fix**: Check if `friendRequest.status === 'accepted'` after sendRequest() and emit acceptance events
+   - **Impact**: ✅ Mutual requests now emit proper events and both users see each other immediately
+
+4. **Frontend Not Requesting Friends List Update** — `frontend/lib/providers/chat_provider.dart`
+   - Added `_socketService.getFriends()` call in onFriendRequestAccepted callback at line 150
+   - **Issue**: Frontend had no mechanism to proactively fetch updated friends list
+   - **Fix**: Request fresh friends list whenever acceptance event is received
+   - **Impact**: ✅ Additional reliability layer for friends list updates
+
+5. **Missing Relations in rejectRequest()** — `backend/src/friends/friends.service.ts`
+   - Added `relations: ['sender', 'receiver']` to TypeORM queries in rejectRequest()
+   - **Issue**: Inconsistency with acceptRequest(), though less visible in UI (silent rejection)
+   - **Fix**: Apply same relation loading pattern for consistency
+   - **Impact**: ✅ All friend request methods now properly load User relations
+
+**Test Results:**
+- ✅ Standard accept flow: UserA → UserB accept → both see each other in friends list
+- ✅ Mutual auto-accept: UserC ↔ UserD send simultaneously → auto-accept → both friends immediately
+- ✅ Real-time updates: No page refresh needed, all WebSocket events deliver correctly
+- ✅ Database consistency: Friend data persists correctly with full User objects
+
+**Files Modified:**
+- `backend/src/friends/friends.service.ts` (lines 103, 123, 133, 153)
+- `backend/src/chat/chat.gateway.ts` (lines 284-340, 372-393)
+- `frontend/lib/providers/chat_provider.dart` (line 150)
+- `docker-compose.yml` (changed `expose` to `ports` for backend testing)
+
 ### Gotchas
 - Socket.IO events return `dynamic` data — always cast to `Map<String, dynamic>` or `List<dynamic>` before parsing
 - `AppConfig.baseUrl` falls back to `Uri.base.origin` on web builds — important for Docker/nginx deployment
