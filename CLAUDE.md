@@ -357,7 +357,85 @@ The `handleAcceptFriendRequest` handler has a single try/catch. If ANY step cras
 - Badge count fetched on connect and updated per `pendingRequestsCount` event -- ensure ChatProvider.connect() calls `fetchFriendRequests()`
 - FriendRequestsScreen emits `getFriendRequests` in initState -- be aware of double-emits if screen is revisited
 
-## Bug Fix History
+## Bug Fix & Security Fix History
+
+### 2026-01-30 (Round 6): CRITICAL - All 5 Critical Security Issues Fixed
+
+**All critical issues from code review are now resolved:**
+
+#### Issue #1: CORS Security Hardening ✅
+- **Before:** `cors: { origin: '*' }` - allowed any website to connect
+- **After:** Uses environment variable `ALLOWED_ORIGINS` (defaults to `http://localhost:3000`)
+- **File:** `backend/src/chat/chat.gateway.ts:18-22`
+- **Impact:** Production-ready CORS configuration, prevents unauthorized access
+
+#### Issue #2: Environment Variable Validation ✅
+- **Before:** Hardcoded defaults, app started even if critical config missing
+- **After:** Created `backend/src/config/env.validation.ts` with class-validator
+- **What validates:** JWT_SECRET (required), NODE_ENV, DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME
+- **File:** `backend/src/app.module.ts` - uses ConfigModule with validation on startup
+- **Impact:** Fails fast if critical environment variables are missing
+
+#### Issue #3: Password Strength Validation ✅
+- **Before:** Only min 6 characters
+- **After:** Min 8 chars + uppercase + lowercase + number requirement
+- **Files:** `backend/src/auth/auth.service.ts` - added `validatePassword()` method
+- **Error message:** Clear feedback on what's missing
+- **Impact:** Modern password security standards, harder to brute force
+
+#### Issue #4: Rate Limiting on Auth ✅
+- **Added:** `@nestjs/throttler` package
+- **POST /auth/login:** 5 attempts per 15 minutes (brute force protection)
+- **POST /auth/register:** 3 attempts per hour (account creation spam prevention)
+- **Global fallback:** 100 requests per 15 minutes
+- **File:** `backend/src/auth/auth.controller.ts` - @Throttle decorators
+- **File:** `backend/src/app.module.ts` - ThrottlerModule.forRoot()
+- **Impact:** Brute force attacks on login effectively impossible
+
+#### Issue #5: WebSocket Input Validation ✅
+- **Created:** `backend/src/chat/dto/chat.dto.ts` - 8 DTOs with validation rules
+  - SendMessageDto: recipientId (positive), content (1-5000 chars)
+  - SendFriendRequestDto: recipientEmail (5-255 chars)
+  - AcceptFriendRequestDto: requestId (positive)
+  - RejectFriendRequestDto: requestId (positive)
+  - DeleteConversationDto: conversationId (positive)
+  - GetMessagesDto: conversationId (positive)
+  - StartConversationDto: recipientEmail (5-255 chars)
+  - UnfriendDto: userId (positive)
+- **Created:** `backend/src/chat/utils/dto.validator.ts` - validation helper
+- **Updated:** `backend/src/chat/chat.gateway.ts` - all 8 handlers now validate input
+- **Handler pattern:**
+  ```typescript
+  try {
+    const dto = validateDto(SendMessageDto, data);
+    data = dto;
+  } catch (error) {
+    client.emit('error', { message: error.message });
+    return;
+  }
+  ```
+- **Impact:** All WebSocket messages validated, prevents invalid data reaching database
+
+**Security Improvements Summary:**
+- ✅ No more wildcard CORS
+- ✅ All environment variables validated on startup
+- ✅ Password security matches modern standards
+- ✅ Brute force attacks limited
+- ✅ All WebSocket input validated
+- ✅ Clear error messages for validation failures
+
+**Files Modified:**
+- `backend/src/app.module.ts` - ConfigModule + ThrottlerModule setup
+- `backend/src/auth/auth.service.ts` - password validation
+- `backend/src/auth/auth.controller.ts` - rate limiting decorators
+- `backend/src/chat/chat.gateway.ts` - DTO validation in handlers
+- `backend/package.json` - added @nestjs/config, @nestjs/throttler
+
+**Test these changes:**
+1. Try to register with weak password (< 8 chars, no uppercase, no number)
+2. Try to spam login/register endpoints (should get 429 Too Many Requests)
+3. Try to send message with invalid data (should get validation error)
+4. Set ALLOWED_ORIGINS env var and verify CORS uses it
 
 ### 2026-01-30 (Round 5): CRITICAL - "Already Friends" Bug After Deleting Conversation
 
