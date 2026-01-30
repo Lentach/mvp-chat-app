@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { Logger } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { ConversationsService } from '../conversations/conversations.service';
 import { MessagesService } from '../messages/messages.service';
@@ -32,6 +33,8 @@ import {
   },
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  private readonly logger = new Logger(ChatGateway.name);
+
   @WebSocketServer()
   server: Server;
 
@@ -72,7 +75,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.data.user = { id: user.id, email: user.email, username: user.username };
       this.onlineUsers.set(user.id, client.id);
 
-      console.log(`User connected: ${user.email} (socket: ${client.id})`);
+      this.logger.debug(`User connected: ${user.email} (socket: ${client.id})`);
     } catch {
       client.disconnect();
     }
@@ -81,7 +84,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(client: Socket) {
     if (client.data.user) {
       this.onlineUsers.delete(client.data.user.id);
-      console.log(`User disconnected: ${client.data.user.email}`);
+      this.logger.debug(`User disconnected: ${client.data.user.email}`);
     }
   }
 
@@ -95,21 +98,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('sendMessage')
   async handleMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     const senderId: number = client.data.user?.id;
     if (!senderId) return;
 
+    let dto: SendMessageDto;
     try {
-      const dto = validateDto(SendMessageDto, data);
-      data = dto;
+      dto = validateDto(SendMessageDto, data);
     } catch (error) {
       client.emit('error', { message: error.message });
       return;
     }
 
     const sender = await this.usersService.findById(senderId);
-    const recipient = await this.usersService.findById(data.recipientId);
+    const recipient = await this.usersService.findById(dto.recipientId);
 
     if (!sender || !recipient) {
       client.emit('error', { message: 'User not found' });
@@ -160,7 +163,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('startConversation')
   async handleStartConversation(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     const senderId: number = client.data.user?.id;
     if (!senderId) {
@@ -175,14 +178,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    console.log('startConversation: validated email:', data.recipientEmail);
+    this.logger.debug('startConversation: validated email:', data.recipientEmail);
 
     const sender = await this.usersService.findById(senderId);
     const recipient = await this.usersService.findByEmail(data.recipientEmail);
-    console.log('startConversation: sender=', sender?.email, 'recipient=', recipient?.email, 'recipientEmail=', data.recipientEmail);
+    this.logger.debug('startConversation: sender=', sender?.email, 'recipient=', recipient?.email, 'recipientEmail=', data.recipientEmail);
 
     if (!sender || !recipient) {
-      console.log('startConversation: user not found, emitting error');
+      this.logger.debug('startConversation: user not found, emitting error');
       client.emit('error', { message: 'User not found' });
       return;
     }
@@ -222,7 +225,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('getMessages')
   async handleGetMessages(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     try {
       const dto = validateDto(GetMessagesDto, data);
@@ -273,7 +276,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('deleteConversation')
   async handleDeleteConversation(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     const userId = client.data.user?.id;
     if (!userId) return;
@@ -300,22 +303,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ? conversation.userTwo.id
         : conversation.userOne.id;
 
-      console.log(`deleteConversation: userId=${userId}, otherUserId=${otherUserId}, conversationId=${data.conversationId}`);
+      this.logger.debug(`deleteConversation: userId=${userId}, otherUserId=${otherUserId}, conversationId=${data.conversationId}`);
 
       // CRITICAL FIX: Delete the friend relationship first
       // This prevents "Already friends" error when trying to send a new friend request later
       const unfriendResult = await this.friendsService.unfriend(userId, otherUserId);
-      console.log(`deleteConversation: unfriend result=${unfriendResult}`);
+      this.logger.debug(`deleteConversation: unfriend result=${unfriendResult}`);
 
       // Then delete the conversation
       await this.conversationsService.delete(data.conversationId);
-      console.log(`deleteConversation: conversation deleted`);
+      this.logger.debug(`deleteConversation: conversation deleted`);
 
       // Notify the other user
       const otherUserSocketId = this.onlineUsers.get(otherUserId);
       if (otherUserSocketId) {
         this.server.to(otherUserSocketId).emit('unfriended', { userId });
-        console.log(`deleteConversation: notified other user`);
+        this.logger.debug(`deleteConversation: notified other user`);
       }
 
       // Refresh conversations list for current user
@@ -353,9 +356,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         })));
       }
 
-      console.log(`deleteConversation: all updates sent`);
+      this.logger.debug(`deleteConversation: all updates sent`);
     } catch (error) {
-      console.error('deleteConversation ERROR:', error);
+      this.logger.error('deleteConversation ERROR:', error);
       client.emit('error', { message: error.message });
     }
   }
@@ -364,7 +367,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('sendFriendRequest')
   async handleSendFriendRequest(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     const senderId: number = client.data.user?.id;
     if (!senderId) return;
@@ -386,9 +389,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      console.log(`sendFriendRequest: sender=${sender.email} (id=${sender.id}), recipient=${recipient.email} (id=${recipient.id})`);
+      this.logger.debug(`sendFriendRequest: sender=${sender.email} (id=${sender.id}), recipient=${recipient.email} (id=${recipient.id})`);
       const friendRequest = await this.friendsService.sendRequest(sender, recipient);
-      console.log(`sendFriendRequest: created request id=${friendRequest.id}, status=${friendRequest.status}`);
+      this.logger.debug(`sendFriendRequest: created request id=${friendRequest.id}, status=${friendRequest.status}`);
 
       const payload = {
         id: friendRequest.id,
@@ -401,7 +404,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Check if it was auto-accepted (mutual request scenario)
       if (friendRequest.status === 'accepted') {
-        console.log(`Auto-accept: ${sender.email} <-> ${recipient.email}`);
+        this.logger.debug(`Auto-accept: ${sender.email} <-> ${recipient.email}`);
 
         // It was auto-accepted! Emit acceptance events to both users
         client.emit('friendRequestAccepted', payload);
@@ -427,7 +430,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
         // Create conversation between the two users
         const conversation = await this.conversationsService.findOrCreate(sender, recipient);
-        console.log(`Auto-accept: conversation created/found id=${conversation.id}`);
+        this.logger.debug(`Auto-accept: conversation created/found id=${conversation.id}`);
 
         // Refresh conversations for both users
         const senderConversations = await this.conversationsService.findByUser(sender.id);
@@ -470,22 +473,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       } else {
         // Normal pending request flow
         // Notify sender
-        console.log(`sendFriendRequest: emitting friendRequestSent to sender ${sender.email}`);
+        this.logger.debug(`sendFriendRequest: emitting friendRequestSent to sender ${sender.email}`);
         client.emit('friendRequestSent', payload);
 
         // Notify recipient if online
         const recipientSocketId = this.onlineUsers.get(recipient.id);
-        console.log(`sendFriendRequest: recipient ${recipient.email} (id=${recipient.id}) socketId=${recipientSocketId || 'OFFLINE'}`);
+        this.logger.debug(`sendFriendRequest: recipient ${recipient.email} (id=${recipient.id}) socketId=${recipientSocketId || 'OFFLINE'}`);
         if (recipientSocketId) {
           this.server.to(recipientSocketId).emit('newFriendRequest', payload);
           // Also send updated count
           const count = await this.friendsService.getPendingRequestCount(recipient.id);
           this.server.to(recipientSocketId).emit('pendingRequestsCount', { count });
-          console.log(`sendFriendRequest: emitted newFriendRequest + pendingRequestsCount(${count}) to recipient`);
+          this.logger.debug(`sendFriendRequest: emitted newFriendRequest + pendingRequestsCount(${count}) to recipient`);
         }
       }
     } catch (error) {
-      console.error(`sendFriendRequest ERROR: ${error.message}`);
+      this.logger.error(`sendFriendRequest ERROR: ${error.message}`);
       client.emit('error', { message: error.message });
     }
   }
@@ -494,7 +497,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('acceptFriendRequest')
   async handleAcceptFriendRequest(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     const userId: number = client.data.user?.id;
     if (!userId) return;
@@ -508,9 +511,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      console.log(`acceptFriendRequest: requestId=${data.requestId}, userId=${userId}`);
+      this.logger.debug(`acceptFriendRequest: requestId=${data.requestId}, userId=${userId}`);
       const friendRequest = await this.friendsService.acceptRequest(data.requestId, userId);
-      console.log(`acceptFriendRequest: accepted, sender=${friendRequest.sender.id} (${friendRequest.sender.email}), receiver=${friendRequest.receiver.id} (${friendRequest.receiver.email})`);
+      this.logger.debug(`acceptFriendRequest: accepted, sender=${friendRequest.sender.id} (${friendRequest.sender.email}), receiver=${friendRequest.receiver.id} (${friendRequest.receiver.email})`);
 
       const payload = {
         id: friendRequest.id,
@@ -535,7 +538,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       let conversation: any = null;
       if (senderUser && receiverUser) {
         conversation = await this.conversationsService.findOrCreate(senderUser, receiverUser);
-        console.log(`acceptFriendRequest: conversation id=${conversation.id}`);
+        this.logger.debug(`acceptFriendRequest: conversation id=${conversation.id}`);
       }
 
       // Refresh conversations for both
@@ -577,7 +580,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Emit updated friends lists to BOTH users
       const senderFriends = await this.friendsService.getFriends(friendRequest.sender.id);
-      console.log(`acceptFriendRequest: senderFriends count=${senderFriends.length}`);
+      this.logger.debug(`acceptFriendRequest: senderFriends count=${senderFriends.length}`);
       const senderFriendsPayload = senderFriends.map((f) => ({
         id: f.id,
         email: f.email,
@@ -585,7 +588,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }));
 
       const receiverFriends = await this.friendsService.getFriends(userId);
-      console.log(`acceptFriendRequest: receiverFriends count=${receiverFriends.length}`);
+      this.logger.debug(`acceptFriendRequest: receiverFriends count=${receiverFriends.length}`);
       const receiverFriendsPayload = receiverFriends.map((f) => ({
         id: f.id,
         email: f.email,
@@ -602,7 +605,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Emit openConversation to navigate both users to the chat
       if (conversation) {
-        console.log(`acceptFriendRequest: emitting openConversation id=${conversation.id}`);
+        this.logger.debug(`acceptFriendRequest: emitting openConversation id=${conversation.id}`);
         client.emit('openConversation', { conversationId: conversation.id });
 
         if (senderSocketId) {
@@ -612,7 +615,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
       }
     } catch (error) {
-      console.error('acceptFriendRequest ERROR:', error);
+      this.logger.error('acceptFriendRequest ERROR:', error);
       client.emit('error', { message: error.message });
     }
   }
@@ -621,7 +624,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('rejectFriendRequest')
   async handleRejectFriendRequest(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     const userId: number = client.data.user?.id;
     if (!userId) return;
@@ -719,7 +722,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('unfriend')
   async handleUnfriend(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: unknown,
+    @MessageBody() data: any,
   ) {
     const currentUserId: number = client.data.user?.id;
     if (!currentUserId) return;
@@ -733,7 +736,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      console.log(`handleUnfriend: currentUserId=${currentUserId}, targetUserId=${data.userId}`);
+      this.logger.debug(`handleUnfriend: currentUserId=${currentUserId}, targetUserId=${data.userId}`);
 
       // Delete the friend relationship
       await this.friendsService.unfriend(currentUserId, data.userId);
@@ -742,7 +745,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const conversation = await this.conversationsService.findByUsers(currentUserId, data.userId);
       if (conversation) {
         await this.conversationsService.delete(conversation.id);
-        console.log(`handleUnfriend: deleted conversation id=${conversation.id}`);
+        this.logger.debug(`handleUnfriend: deleted conversation id=${conversation.id}`);
       }
 
       // Notify both users
@@ -781,17 +784,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('friendsList', currentUserFriends.map(f => ({
         id: f.id, email: f.email, username: f.username,
       })));
-      console.log(`handleUnfriend: emitted friendsList to currentUser, count=${currentUserFriends.length}`);
+      this.logger.debug(`handleUnfriend: emitted friendsList to currentUser, count=${currentUserFriends.length}`);
 
       if (otherUserSocketId) {
         const otherUserFriends = await this.friendsService.getFriends(data.userId);
         this.server.to(otherUserSocketId).emit('friendsList', otherUserFriends.map(f => ({
           id: f.id, email: f.email, username: f.username,
         })));
-        console.log(`handleUnfriend: emitted friendsList to otherUser, count=${otherUserFriends.length}`);
+        this.logger.debug(`handleUnfriend: emitted friendsList to otherUser, count=${otherUserFriends.length}`);
       }
     } catch (error) {
-      console.error('handleUnfriend ERROR:', error);
+      this.logger.error('handleUnfriend ERROR:', error);
       client.emit('error', { message: error.message });
     }
   }

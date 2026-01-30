@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FriendRequest, FriendRequestStatus } from './friend-request.entity';
@@ -6,6 +6,8 @@ import { User } from '../users/user.entity';
 
 @Injectable()
 export class FriendsService {
+  private readonly logger = new Logger(FriendsService.name);
+
   constructor(
     @InjectRepository(FriendRequest)
     private friendRequestRepository: Repository<FriendRequest>,
@@ -242,14 +244,14 @@ export class FriendsService {
       ],
     });
 
-    console.log(`unfriend: found ${friendships.length} ACCEPTED records between users ${userId1} and ${userId2}`);
+    this.logger.debug(`unfriend: found ${friendships.length} ACCEPTED records between users ${userId1} and ${userId2}`);
 
     if (friendships.length === 0) {
       return false;
     }
 
     await this.friendRequestRepository.remove(friendships);
-    console.log(`unfriend: removed ${friendships.length} records`);
+    this.logger.debug(`unfriend: removed ${friendships.length} records`);
     return true;
   }
 
