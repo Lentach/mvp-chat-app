@@ -1,7 +1,10 @@
 # CLAUDE.md - MVP Chat App Knowledge Base
 
 **Last updated:** 2026-01-30
-**Single source of truth for all agents.** Update immediately after any code change.
+
+**MANDATORY RULE: Keep This File Up To Date**
+
+**After EVERY code change (bug fix, new feature, refactor, config change), update this file immediately.** This is the single source of truth for future agents.A future agent must be able to read ONLY this file and understand the current state of the project without reading every source file
 
 ---
 
@@ -275,11 +278,15 @@ if (records.length > 0) {
 ✅ **Issue #9: Mapper Classes**
 - Extracted UserMapper, ConversationMapper, FriendRequestMapper → ~50 lines eliminated
 
-### In Progress
+✅ **Issue #10: Message Pagination**
+- Added limit/offset parameters to `MessagesService.findByConversation()` (default: 50, 0)
+- Updated GetMessagesDto with optional limit and offset fields
+- Updated ChatGateway.handleGetMessages() to pass pagination params
+- Added SocketService.getMessages() optional parameters
+- Added ChatProvider.loadMoreMessages() method for incremental loading
+- Messages now support pagination via WebSocket
 
-⏳ **Issue #10: Message Pagination**
-- Add limit/offset parameters to `MessagesService.findByConversation()`
-- Update frontend to request pagination
+### In Progress
 
 ⏳ **Issue #8: Split Gateway**
 - Break 750-line `chat.gateway.ts` into `ChatMessageService`, `ChatFriendRequestService`, `ChatConversationService`
@@ -402,7 +409,7 @@ google_fonts: ^6.2.1                # Press Start 2P + Inter
 - ❌ No user search/discovery — must know exact email to send friend request
 - ❌ No user profiles beyond email/username
 - ❌ No typing indicators, read receipts, message editing/deletion
-- ❌ No message pagination — always returns last 50
+- ✅ Message pagination supported (limit/offset params, default 50 messages)
 - ❌ No last message in `conversationsList` — track client-side
 - ❌ No database unique constraint on user pair (deduplication in `findOrCreate`)
 - ❌ No unique constraint on (sender, receiver) in friend_requests (intentional, allows resend)
@@ -488,9 +495,8 @@ Commit: b9edc3b, docs: 02720c8
 **Current issues (lower priority):**
 - Chat gateway still large (750 lines, needs split into services)
 - Individual error handling (some multi-step handlers catch errors at end)
-- No pagination for messages (hardcoded 50)
 - No test coverage (zero tests currently)
-- Magic numbers scattered (500ms delay, 50 message limit, 600px breakpoint)
+- Magic numbers scattered (500ms delay, 600px breakpoint)
 - Could use database indexes on frequently-queried columns
 
 ---

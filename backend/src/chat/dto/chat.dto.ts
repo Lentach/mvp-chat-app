@@ -1,4 +1,4 @@
-import { IsNumber, IsString, IsPositive, MinLength, MaxLength } from 'class-validator';
+import { IsNumber, IsString, IsPositive, MinLength, MaxLength, IsOptional, Min } from 'class-validator';
 
 export class SendMessageDto {
   @IsNumber()
@@ -40,6 +40,16 @@ export class GetMessagesDto {
   @IsNumber()
   @IsPositive()
   conversationId: number;
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  limit?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  offset?: number;
 }
 
 export class StartConversationDto {

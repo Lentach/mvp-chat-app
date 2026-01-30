@@ -72,10 +72,13 @@ class SocketService {
     });
   }
 
-  void getMessages(int conversationId) {
-    _socket?.emit('getMessages', {
+  void getMessages(int conversationId, {int? limit, int? offset}) {
+    final payload = <String, dynamic>{
       'conversationId': conversationId,
-    });
+    };
+    if (limit != null) payload['limit'] = limit;
+    if (offset != null) payload['offset'] = offset;
+    _socket?.emit('getMessages', payload);
   }
 
   void deleteConversation(int conversationId) {

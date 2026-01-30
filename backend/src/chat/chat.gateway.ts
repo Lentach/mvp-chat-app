@@ -240,6 +240,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const messages = await this.messagesService.findByConversation(
       data.conversationId,
+      data.limit,
+      data.offset,
     );
 
     const mapped = messages.map((m) => ({

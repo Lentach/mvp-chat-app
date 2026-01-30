@@ -199,11 +199,19 @@ class ChatProvider extends ChangeNotifier {
     );
   }
 
-  void openConversation(int conversationId) {
+  void openConversation(int conversationId, {int limit = 50}) {
     _activeConversationId = conversationId;
     _messages = [];
-    _socketService.getMessages(conversationId);
+    _socketService.getMessages(conversationId, limit: limit);
     notifyListeners();
+  }
+
+  // Load more messages for the active conversation
+  // Fetches messages with increased limit (current + additional)
+  void loadMoreMessages({int additionalLimit = 50}) {
+    if (_activeConversationId == null) return;
+    final newLimit = _messages.length + additionalLimit;
+    _socketService.getMessages(_activeConversationId!, limit: newLimit);
   }
 
   void clearActiveConversation() {
