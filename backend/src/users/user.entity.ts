@@ -13,6 +13,9 @@ export class User {
   @Column({ unique: true })
   email: string;
 
+  @Column({ unique: true, nullable: true })
+  username: string;
+
   // Hasło przechowujemy jako hash (bcrypt) — nigdy jako plain text
   @Column()
   password: string;

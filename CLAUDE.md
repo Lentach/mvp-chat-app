@@ -84,7 +84,7 @@ Frontend uses `BASE_URL` dart define (defaults to `http://localhost:3000`). In D
 ## Backend API Reference
 
 ### REST Endpoints (only 2 exist)
-- `POST /auth/register` — Body: `{email, password}` → Returns `{id, email}`. Password min 6 chars. ConflictException if email exists.
+- `POST /auth/register` — Body: `{email, username, password}` → Returns `{id, email, username}`. Password min 6 chars. Username must be unique. ConflictException if email or username exists.
 - `POST /auth/login` — Body: `{email, password}` → Returns `{access_token}`. UnauthorizedException on bad creds.
 
 **There are NO other REST endpoints.** All chat operations use WebSocket.
@@ -112,7 +112,7 @@ Frontend uses `BASE_URL` dart define (defaults to `http://localhost:3000`). In D
 ### Backend Limitations (no endpoints for these)
 - No user search/discovery — must know exact email to start conversation
 - No contacts/friends list — conversations list is the only "contacts"
-- No user profiles — users only have `id`, `email`, `password`, `createdAt`
+- No user profiles beyond basic info — users have `id`, `email`, `username`, `password`, `createdAt`
 - No typing indicators, read receipts, or message editing/deletion
 - No pagination — `getMessages` always returns last 50
 - No last message included in `conversationsList` — must track client-side
@@ -121,7 +121,7 @@ Frontend uses `BASE_URL` dart define (defaults to `http://localhost:3000`). In D
 ## Entity Models (Backend)
 
 ```
-User: id (PK), email (unique), password (bcrypt), createdAt
+User: id (PK), email (unique), username (unique, nullable), password (bcrypt), createdAt
 Conversation: id (PK), userOne (FK→User, eager), userTwo (FK→User, eager), createdAt
 Message: id (PK), content (text), sender (FK→User, eager), conversation (FK→Conversation, lazy), createdAt
 ```
