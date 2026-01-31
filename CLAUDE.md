@@ -1,10 +1,29 @@
 # CLAUDE.md - MVP Chat App Knowledge Base
 
-**Last updated:** 2026-01-30
+**Last updated:** 2026-01-31
 
 **MANDATORY RULE: Keep This File Up To Date**
 
 **After EVERY code change (bug fix, new feature, refactor, config change), update this file immediately.** This is the single source of truth for future agents.A future agent must be able to read ONLY this file and understand the current state of the project without reading every source file
+
+---
+
+## ✅ PREVIOUSLY CRITICAL ISSUE - NOW RESOLVED
+
+**BUG (FIXED):** New users saw conversations/friends from previously logged-out users.
+
+**Root cause:** Two issues combined:
+1. **`socket_io_client` (Dart) caches sockets by URL.** `io.io('http://localhost:3000')` returned the cached socket authenticated as the previous user instead of creating a new connection with the new user's JWT token.
+2. **`notifyListeners()` was not called after clearing state in `connect()`**, so the UI didn't immediately reflect the empty state.
+
+**Fix applied (Round 10):**
+- Added `enableForceNew()` to `SocketService.connect()` — forces a new socket connection every time, bypassing the internal cache
+- Added defensive socket cleanup before creating new connections
+- Added `notifyListeners()` after state clearing in `ChatProvider.connect()`
+
+**Files modified:**
+- `frontend/lib/services/socket_service.dart` — `enableForceNew()` + defensive cleanup
+- `frontend/lib/providers/chat_provider.dart` — `notifyListeners()` after state clear
 
 ---
 
@@ -45,6 +64,21 @@ docker-compose up --build
 # OR separately:
 cd backend && npm run start:dev        # needs local PostgreSQL
 cd frontend && flutter run -d chrome
+```
+
+**⚠️ IMPORTANT:** Before running, ensure no other instances are running:
+```bash
+# Check for running Node.js processes
+tasklist | grep -i node    # Windows
+ps aux | grep node         # Linux/Mac
+
+# Kill all Node.js if needed
+taskkill //F //IM node.exe  # Windows
+pkill node                  # Linux/Mac
+
+# Verify only Docker backend is running
+docker ps
+netstat -ano | grep :3000
 ```
 
 **Build:**
@@ -235,7 +269,34 @@ if (records.length > 0) {
 **Impact:** Users get silent failures (no friends added, chat doesn't open).
 **Solution:** Wrap individual operations separately, emit partial success where possible.
 
-### 5. Other Key Points
+### 5. Multiple Backend Instances (DEBUGGING)
+
+**Problem:** Frontend shows different data than backend logs suggest.
+**Root cause:** Multiple backend instances running on same port (Docker + local).
+
+**How to detect:**
+- Frontend logs show userId X connecting
+- Backend logs show NO connection from userId X
+- Check running processes: `tasklist | grep -i node` or `ps aux | grep node`
+- Check port ownership: `netstat -ano | grep :3000`
+
+**How to fix:**
+- Kill all local Node.js processes before testing
+- Use `docker-compose down` then `docker-compose up` to ensure clean state
+- Verify only ONE backend is running: `docker ps` and `netstat -ano | grep LISTENING`
+
+**Warning signs:**
+- Database shows 0 conversations but frontend receives "1 conversation"
+- Backend validation works ("You can only message friends") but getConversations() returns wrong data
+- Changes to code don't appear in running app (connecting to old instance)
+
+### 6. Socket.IO Client Caches Sockets by URL (Dart)
+
+**Problem:** `socket_io_client` Dart package caches socket instances by URL. Calling `io.io(url, newOptions)` after `disconnect()`/`dispose()` can return a cached socket with old auth credentials.
+**Rule:** ALWAYS use `enableForceNew()` in OptionBuilder when the same URL may be reused with different JWT tokens (e.g., after logout/login).
+**File:** `frontend/lib/services/socket_service.dart`
+
+### 7. Other Key Points
 
 - `deleteConversation` NOW calls `unfriend()` → both delete conversation AND break friendship
 - `friendRequestRejected` sent ONLY to receiver (silent rejection)
@@ -512,6 +573,117 @@ multer                              # File upload middleware
 ---
 
 ## 📋 BUG FIX HISTORY
+
+### 2026-01-31 (Round 10) - Socket Cache Causing Session Data Leakage (FINAL FIX)
+
+**Problem:** After logout → login as different user, the new user saw conversations/friends from the previously logged-in user. Data disappeared after page refresh.
+
+**Root cause:** The `socket_io_client` Dart library internally caches socket instances by URL. When `io.io('http://localhost:3000', options)` was called for user B after user A logged out, the library returned the **cached socket still authenticated with user A's JWT token**. The backend verified the old token and returned user A's data.
+
+**Contributing factor:** A `dartvm.exe` (Flutter dev server) process was also running on port 8080, conflicting with the Docker nginx frontend on the same port. The browser connected to the dev server (serving old code without the fix) instead of Docker.
+
+**Fix:**
+1. Added `enableForceNew()` to `SocketService.connect()` OptionBuilder — forces a completely new socket connection, bypassing the internal cache
+2. Added defensive socket cleanup (`disconnect()` + `dispose()`) at the start of `SocketService.connect()` before creating a new socket
+3. Added `notifyListeners()` after clearing state in `ChatProvider.connect()` so UI immediately shows empty state
+
+**Files modified:**
+- `frontend/lib/services/socket_service.dart` — `enableForceNew()` + defensive cleanup
+- `frontend/lib/providers/chat_provider.dart` — `notifyListeners()` after state clear
+
+**Lesson learned:**
+- `socket_io_client` in Dart caches sockets by URL — ALWAYS use `enableForceNew()` when reconnecting with different credentials
+- Always check for conflicting processes on the same port (`netstat -ano | findstr :PORT`, `tasklist | findstr PID`)
+- DDC module loader in browser console = debug build from `flutter run`, not Docker release build
+
+**Testing:**
+- ✅ Login user A → logout → login user B → user B sees empty state (correct)
+- ✅ Backend logs confirm user B connects as user B (not user A)
+- ✅ Page refresh no longer needed to see correct data
+
+### 2026-01-31 (Round 9) - Multiple Backend Instances (DEBUGGING LESSON)
+
+**Problem:** After implementing Round 8 fix, testing showed that new users STILL saw conversations/friends from previous users.
+
+**Root cause (UNEXPECTED):** Two backend instances running simultaneously:
+1. **Docker backend** (port 3000) - with all fixes, monitored in logs
+2. **Local backend** (port 3000) - old code via `npm run start:dev`, WITHOUT fixes
+
+**Why this happened:**
+- User had started local backend during development
+- Later started Docker backend on same port
+- Windows port binding allowed both to coexist (Docker proxy)
+- Frontend connected to **local backend** (old buggy code)
+- Developer monitored **Docker backend** logs (correct code, but no connections!)
+
+**Symptoms that revealed the issue:**
+- Frontend logs showed userId: 111 (ziomek71) connecting
+- Backend (Docker) logs showed NO connection from userId: 111
+- Backend correctly validated "You can only message friends" for user 111
+- But `getConversations()` and `getFriends()` returned wrong data
+- Database queries showed user 111 had ZERO conversations
+- Yet frontend received "1 conversation, 1 friend"
+
+**How it was discovered:**
+1. Added detailed logging to `ConversationsService.findByUser()` and `FriendsService.getFriends()`
+2. Logs showed Docker backend NEVER received connections from new users
+3. Checked running processes: multiple `node.exe` instances found
+4. Killed all local Node.js processes → problem disappeared
+
+**Fix:**
+```bash
+# Kill all local Node.js processes
+tasklist | grep -i "node.exe" | awk '{print $2}' | xargs -I {} taskkill //F //PID {}
+```
+
+**Files modified:**
+- None (code was already correct in Docker backend)
+
+**Lesson learned:**
+- ✅ **ALWAYS check for multiple instances of the same service**
+- ✅ When frontend shows different data than backend logs, suspect connection to wrong backend
+- ✅ Use `netstat -ano` to verify which process owns which port
+- ✅ When testing fixes, ensure old dev servers are stopped before starting new ones
+- ✅ Docker port 3000 → host 3000 can coexist with local :3000, causing confusion
+
+**Testing:**
+- ✅ After killing local backends, new users see empty conversations list
+- ✅ Frontend connects to Docker backend (verified in logs)
+- ✅ Session isolation works correctly
+
+### 2026-01-31 (Round 8) - Session Data Leakage Fix (CRITICAL)
+
+**Problem:** After logout → register new user → login, the new user saw conversations/friends of the previously logged-out user.
+
+**Root cause:** Race condition between two postFrameCallbacks:
+1. AuthGate detects login transition → schedules `chat.disconnect()` in postFrameCallback
+2. ConversationsScreen.initState() → schedules `chat.connect()` in postFrameCallback
+3. **Order of execution is NOT guaranteed** - if `connect()` runs before `disconnect()`, old data persists
+4. Even worse: `connect()` would fetch new user's data, then `disconnect()` would clear it
+
+**Fix:**
+1. **ChatProvider.connect()** (line 76-88) - ALWAYS clear ALL state variables at the very start:
+   - Clears conversations, messages, friends, friend requests, last messages, flags
+   - This happens BEFORE any socket operations
+   - Prevents race condition - state is clean regardless of postFrameCallback order
+   - Old socket cleanup happens after state clear
+
+2. **AuthGate** (line 54-62) - Changed to also clear on logout transition (true → false):
+   - Detects when user logs out and calls `chat.disconnect()` for extra safety
+   - Guarantees clean state when returning to login screen
+
+**Files modified:**
+- `frontend/lib/providers/chat_provider.dart` - Added state clearing at start of connect()
+- `frontend/lib/main.dart` - AuthGate now clears on logout too
+
+**Why this works:**
+- No matter what order postFrameCallbacks execute, `connect()` ALWAYS starts with clean state
+- Even if `disconnect()` never runs, `connect()` handles cleanup itself
+- Defense in depth: both logout detection AND connect() clear state
+
+**Testing:**
+- ✅ Logout user A → register user B → login user B → verify clean state (no A's data)
+- ✅ Refresh page after logout → old user data disappears immediately
 
 ### 2026-01-30 (Round 7) - Logger + Mappers
 

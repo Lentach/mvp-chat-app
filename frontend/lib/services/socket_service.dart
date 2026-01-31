@@ -26,6 +26,14 @@ class SocketService {
     required void Function(dynamic) onUnfriended,
     required void Function(dynamic) onUserStatusChanged,
   }) {
+    // Defensive cleanup: ensure any previous socket is fully disposed
+    // before creating a new one (prevents cache reuse)
+    if (_socket != null) {
+      _socket!.disconnect();
+      _socket!.dispose();
+      _socket = null;
+    }
+
     _socket = io.io(
       baseUrl,
       io.OptionBuilder()
@@ -33,6 +41,7 @@ class SocketService {
           .setAuth({'token': token})
           .setQuery({'token': token})
           .disableAutoConnect()
+          .enableForceNew()
           .build(),
     );
 

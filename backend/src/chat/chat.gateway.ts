@@ -73,7 +73,8 @@ export class ChatGateway
       this.logger.debug(
         `User connected: ${user.email} (socket: ${client.id})`,
       );
-    } catch {
+    } catch (error) {
+      this.logger.error(`handleConnection failed: ${error.message}`);
       client.disconnect();
     }
   }

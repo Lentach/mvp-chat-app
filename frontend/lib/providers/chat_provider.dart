@@ -74,18 +74,36 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void connect({required String token, required int userId}) {
+    // Clear ALL state before connecting to prevent data leakage between users
+    _conversations = [];
+    _messages = [];
+    _activeConversationId = null;
+    _lastMessages.clear();
+    _pendingOpenConversationId = null;
+    _friendRequests = [];
+    _pendingRequestsCount = 0;
+    _friends = [];
+    _friendRequestJustSent = false;
+    _errorMessage = null;
+
+    // Notify listeners immediately so UI shows empty state
+    notifyListeners();
+
+    // Clean up old socket if it exists
+    if (_socketService.socket != null) {
+      _socketService.disconnect();
+    }
+
     _currentUserId = userId;
     _socketService.connect(
       baseUrl: AppConfig.baseUrl,
       token: token,
       onConnect: () {
-        debugPrint('WebSocket connected, fetching conversations...');
         _socketService.getConversations();
         _socketService.getFriendRequests();
         _socketService.getFriends();
         Future.delayed(const Duration(milliseconds: 500), () {
           if (_conversations.isEmpty) {
-            debugPrint('Retrying getConversations...');
             _socketService.getConversations();
           }
         });
@@ -129,7 +147,6 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners();
       },
       onError: (err) {
-        debugPrint('Socket error: $err');
         if (err is Map<String, dynamic> && err['message'] != null) {
           _errorMessage = err['message'] as String;
         } else {
@@ -150,7 +167,6 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners();
       },
       onFriendRequestSent: (data) {
-        debugPrint('Friend request sent confirmed by server');
         _friendRequestJustSent = true;
         notifyListeners();
       },
@@ -197,7 +213,6 @@ class ChatProvider extends ChangeNotifier {
       onUserStatusChanged: (data) {
         final userId = (data as Map<String, dynamic>)['userId'] as int;
         final activeStatus = data['activeStatus'] as bool;
-        // Update friends list to reflect new status
         _friends = _friends.map((f) {
           if (f.id == userId) {
             return f.copyWith(activeStatus: activeStatus);
@@ -206,9 +221,7 @@ class ChatProvider extends ChangeNotifier {
         }).toList();
         notifyListeners();
       },
-      onDisconnect: (_) {
-        debugPrint('Disconnected from WebSocket');
-      },
+      onDisconnect: (_) {},
     );
   }
 

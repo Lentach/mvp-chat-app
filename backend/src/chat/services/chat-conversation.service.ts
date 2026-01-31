@@ -62,9 +62,15 @@ export class ChatConversationService {
 
   async handleGetConversations(client: Socket) {
     const userId: number = client.data.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      this.logger.warn('handleGetConversations: no userId in client.data');
+      return;
+    }
 
+    this.logger.debug(`handleGetConversations: userId=${userId}, email=${client.data.user?.email}`);
     const conversations = await this.conversationsService.findByUser(userId);
+    this.logger.debug(`handleGetConversations: found ${conversations.length} conversations for userId=${userId}`);
+
     client.emit(
       'conversationsList',
       conversations.map(ConversationMapper.toPayload),

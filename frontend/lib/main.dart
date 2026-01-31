@@ -39,12 +39,30 @@ class RpgChatApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _previousLoggedInState = false;
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final chat = context.read<ChatProvider>();
+
+    // Detect logout transition (true → false) - ensure clean disconnect
+    if (!auth.isLoggedIn && _previousLoggedInState) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        chat.disconnect();
+      });
+    }
+
+    _previousLoggedInState = auth.isLoggedIn;
+
     if (auth.isLoggedIn) {
       return const ConversationsScreen();
     }

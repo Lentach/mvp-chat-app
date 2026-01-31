@@ -44,6 +44,7 @@ export class ConversationsService {
         { userOne: { id: userId } },
         { userTwo: { id: userId } },
       ],
+      relations: ['userOne', 'userTwo'],
     });
   }
 
