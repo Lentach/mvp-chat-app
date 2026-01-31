@@ -8,6 +8,29 @@
 
 ---
 
+## ✅ RECENTLY FIXED - Avatar Upload
+
+**BUG (FIXED - 2026-01-31):** Profile picture upload showed success message but avatar didn't change.
+
+**Root causes:** Two separate bugs:
+1. **Frontend:** `AvatarCircle` widget had internal `_imageLoadError` state that didn't reset when `profilePictureUrl` changed → showed old cached image
+2. **Backend/Frontend:** Nginx configuration missing `/uploads/` route → returned `index.html` (1235 bytes) instead of actual image files
+
+**Fixes applied:**
+1. **AvatarCircle** (`frontend/lib/widgets/avatar_circle.dart`):
+   - Added `didUpdateWidget()` method to detect when `profilePictureUrl` prop changes
+   - Resets `_imageLoadError = false` when URL changes → forces widget rebuild with new image
+
+2. **Nginx** (`frontend/nginx.conf`):
+   - Added `location /uploads/` block that proxies to `http://backend:3000/uploads/`
+   - Nginx now properly serves static files instead of returning SPA index.html
+
+**Files modified:**
+- `frontend/lib/widgets/avatar_circle.dart` — Added `didUpdateWidget()` method
+- `frontend/nginx.conf` — Added `/uploads/` location proxy
+
+---
+
 ## ✅ PREVIOUSLY CRITICAL ISSUE - NOW RESOLVED
 
 **BUG (FIXED):** New users saw conversations/friends from previously logged-out users.

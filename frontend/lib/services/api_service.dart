@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 class ApiService {
   final String baseUrl;
@@ -44,16 +45,35 @@ class ApiService {
     return data['access_token'] as String;
   }
 
-  Future<String> uploadProfilePicture(String token, File imageFile) async {
+  Future<String> uploadProfilePicture(String token, XFile imageFile) async {
     var request = http.MultipartRequest(
       'POST',
       Uri.parse('$baseUrl/users/profile-picture'),
     );
 
     request.headers['Authorization'] = 'Bearer $token';
-    request.files.add(
-      await http.MultipartFile.fromPath('file', imageFile.path),
-    );
+
+    // Handle web vs native platforms
+    if (kIsWeb) {
+      // Web: use readAsBytes with proper MIME type
+      final bytes = await imageFile.readAsBytes();
+      final extension = imageFile.name.toLowerCase().split('.').last;
+      final mimeType = extension == 'png' ? 'image/png' : 'image/jpeg';
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: imageFile.name,
+          contentType: http.MediaType.parse(mimeType),
+        ),
+      );
+    } else {
+      // Native: use fromPath
+      request.files.add(
+        await http.MultipartFile.fromPath('file', imageFile.path),
+      );
+    }
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);

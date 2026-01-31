@@ -26,6 +26,15 @@ class _AvatarCircleState extends State<AvatarCircle> {
   bool _imageLoadError = false;
 
   @override
+  void didUpdateWidget(AvatarCircle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reset error state when profilePictureUrl changes
+    if (oldWidget.profilePictureUrl != widget.profilePictureUrl) {
+      _imageLoadError = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final letter = widget.email.isNotEmpty ? widget.email[0].toUpperCase() : '?';
 
