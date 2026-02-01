@@ -29,6 +29,20 @@ class RpgTheme {
   static const Color outerBorder = Color(0xFF2A2A7A);
   static const Color timeColor = Color(0xFF5555AA);
 
+  // Dark mode – Delete Account palette (primary accent, borders, muted)
+  static const Color accentDark = Color(0xFFFF6666);
+  static const Color borderDark = Color(0xFFCC5555);
+  static const Color mutedDark = Color(0xFF9A8A8A);
+  static const Color buttonBgDark = Color(0xFF8A3333);
+  static const Color activeTabBgDark = Color(0xFF3D2525);
+  static const Color tabBorderDark = Color(0xFF8A5555);
+  static const Color convItemBorderDark = Color(0xFF5A3535);
+  static const Color convItemBgDark = Color(0xFF1E1515);
+  static const Color timeColorDark = Color(0xFF9A7A7A);
+  // Settings tiles in dark: same as Delete Account warning box
+  static Color get settingsTileBgDark => accentDark.withValues(alpha: 0.1);
+  static const Color settingsTileBorderDark = Color(0xFFFF6666);
+
   // Light theme palette - modern neutral (Slack-inspired)
   static const Color primaryLight = Color(0xFF4A154B);
   static const Color primaryLightHover = Color(0xFF611F69);
@@ -54,7 +68,7 @@ class RpgTheme {
       Theme.of(context).brightness == Brightness.dark;
 
   static Color primaryColor(BuildContext context) =>
-      isDark(context) ? gold : primaryLight;
+      isDark(context) ? accentDark : primaryLight;
 
   static Color surfaceColor(BuildContext context) =>
       isDark(context) ? boxBg : boxBgLight;
@@ -78,8 +92,8 @@ class RpgTheme {
     return ThemeData.dark().copyWith(
       scaffoldBackgroundColor: background,
       colorScheme: const ColorScheme.dark(
-        primary: gold,
-        secondary: purple,
+        primary: accentDark,
+        secondary: borderDark,
         surface: boxBg,
         error: errorColor,
         onPrimary: Color(0xFF0A0A2E),
@@ -93,7 +107,7 @@ class RpgTheme {
         centerTitle: false,
         titleTextStyle: GoogleFonts.pressStart2p(
           fontSize: 14,
-          color: gold,
+          color: accentDark,
         ),
         iconTheme: const IconThemeData(color: textColor),
       ),
@@ -102,32 +116,32 @@ class RpgTheme {
         fillColor: inputBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderSide: const BorderSide(color: tabBorder, width: 1.5),
+          borderSide: const BorderSide(color: tabBorderDark, width: 1.5),
           borderRadius: BorderRadius.circular(8),
         ),
         enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: tabBorder, width: 1.5),
+          borderSide: const BorderSide(color: tabBorderDark, width: 1.5),
           borderRadius: BorderRadius.circular(8),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: gold, width: 2),
+          borderSide: const BorderSide(color: accentDark, width: 2),
           borderRadius: BorderRadius.circular(8),
         ),
         errorBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: errorColor, width: 1.5),
           borderRadius: BorderRadius.circular(8),
         ),
-        hintStyle: GoogleFonts.inter(color: mutedText, fontSize: 14),
-        labelStyle: GoogleFonts.inter(color: labelText, fontSize: 14),
+        hintStyle: GoogleFonts.inter(color: mutedDark, fontSize: 14),
+        labelStyle: GoogleFonts.inter(color: mutedDark, fontSize: 14),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: buttonBg,
-          foregroundColor: gold,
+          backgroundColor: buttonBgDark,
+          foregroundColor: accentDark,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: gold, width: 2),
+            side: const BorderSide(color: accentDark, width: 2),
           ),
           textStyle: GoogleFonts.inter(
             fontSize: 16,
@@ -137,29 +151,29 @@ class RpgTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: purple,
+          foregroundColor: borderDark,
           textStyle: GoogleFonts.inter(fontSize: 14),
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: purple,
+        backgroundColor: accentDark,
         foregroundColor: Colors.white,
       ),
       listTileTheme: ListTileThemeData(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         tileColor: Colors.transparent,
-        selectedTileColor: activeTabBg,
+        selectedTileColor: activeTabBgDark,
       ),
       dividerTheme: const DividerThemeData(
-        color: convItemBorder,
+        color: convItemBorderDark,
         thickness: 1,
       ),
       textTheme: TextTheme(
         bodyLarge: GoogleFonts.inter(color: textColor, fontSize: 16),
         bodyMedium: GoogleFonts.inter(color: textColor, fontSize: 14),
-        bodySmall: GoogleFonts.inter(color: mutedText, fontSize: 12),
-        titleLarge: GoogleFonts.pressStart2p(color: gold, fontSize: 16),
+        bodySmall: GoogleFonts.inter(color: mutedDark, fontSize: 12),
+        titleLarge: GoogleFonts.pressStart2p(color: accentDark, fontSize: 16),
         titleMedium: GoogleFonts.inter(color: textColor, fontSize: 16, fontWeight: FontWeight.w600),
         titleSmall: GoogleFonts.inter(color: textColor, fontSize: 14, fontWeight: FontWeight.w600),
         labelLarge: GoogleFonts.inter(color: textColor, fontSize: 14, fontWeight: FontWeight.w500),
@@ -266,7 +280,7 @@ class RpgTheme {
     BuildContext? context,
   }) {
     final iconColor = context != null
-        ? (isDark(context) ? mutedText : textSecondaryLight)
+        ? (isDark(context) ? mutedDark : textSecondaryLight)
         : mutedText;
     return InputDecoration(
       hintText: hintText,

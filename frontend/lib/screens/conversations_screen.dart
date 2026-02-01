@@ -76,7 +76,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       builder: (dialogContext) {
         final colorScheme = Theme.of(dialogContext).colorScheme;
         final mutedColor = RpgTheme.isDark(dialogContext)
-            ? RpgTheme.mutedText
+            ? RpgTheme.mutedDark
             : RpgTheme.textSecondaryLight;
         return AlertDialog(
           backgroundColor: colorScheme.surface,
@@ -205,7 +205,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = RpgTheme.isDark(context);
     final borderColor =
-        isDark ? RpgTheme.convItemBorder : RpgTheme.convItemBorderLight;
+        isDark ? RpgTheme.convItemBorderDark : RpgTheme.convItemBorderLight;
 
     return Scaffold(
       body: Row(
@@ -319,7 +319,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           Icons.chat_bubble_outline,
                           size: 64,
                           color: isDark
-                              ? RpgTheme.mutedText
+                              ? RpgTheme.mutedDark
                               : RpgTheme.textSecondaryLight,
                         ),
                         const SizedBox(height: 16),
@@ -328,7 +328,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           style: RpgTheme.bodyFont(
                             fontSize: 16,
                             color: isDark
-                                ? RpgTheme.mutedText
+                                ? RpgTheme.mutedDark
                                 : RpgTheme.textSecondaryLight,
                           ),
                         ),
@@ -346,7 +346,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final conversations = chat.conversations;
     final isDark = RpgTheme.isDark(context);
     final mutedColor =
-        isDark ? RpgTheme.mutedText : RpgTheme.textSecondaryLight;
+        isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
     if (conversations.isEmpty) {
       return Center(
@@ -366,7 +366,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 'Start a new chat to begin',
                 style: RpgTheme.bodyFont(
                   fontSize: 13,
-                  color: isDark ? RpgTheme.timeColor : RpgTheme.textSecondaryLight,
+                  color: isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight,
                 ),
               ),
             ],

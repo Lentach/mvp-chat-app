@@ -172,12 +172,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = RpgTheme.isDark(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: isDark ? RpgTheme.settingsTileBgDark : colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5), width: 1.5),
+        border: Border.all(
+          color: isDark ? RpgTheme.settingsTileBorderDark : colorScheme.outline.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
       ),
       child: ListTile(
         leading: Icon(icon, color: colorScheme.primary, size: 24),

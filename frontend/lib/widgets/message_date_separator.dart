@@ -21,9 +21,9 @@ class MessageDateSeparator extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = RpgTheme.isDark(context);
     final borderColor =
-        isDark ? RpgTheme.convItemBorder : RpgTheme.convItemBorderLight;
+        isDark ? RpgTheme.convItemBorderDark : RpgTheme.convItemBorderLight;
     final textColor =
-        isDark ? RpgTheme.timeColor : RpgTheme.textSecondaryLight;
+        isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),

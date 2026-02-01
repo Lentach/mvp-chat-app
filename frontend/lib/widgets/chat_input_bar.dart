@@ -43,13 +43,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final isDark = RpgTheme.isDark(context);
     final colorScheme = Theme.of(context).colorScheme;
     final borderColor =
-        isDark ? RpgTheme.convItemBorder : RpgTheme.convItemBorderLight;
+        isDark ? RpgTheme.convItemBorderDark : RpgTheme.convItemBorderLight;
     final inputBg = isDark ? RpgTheme.inputBg : RpgTheme.inputBgLight;
     final tabBorderColor =
-        isDark ? RpgTheme.tabBorder : RpgTheme.tabBorderLight;
+        isDark ? RpgTheme.tabBorderDark : RpgTheme.tabBorderLight;
     final sendIconColor = _hasText
-        ? (isDark ? RpgTheme.gold : Colors.white)
-        : (isDark ? RpgTheme.mutedText : RpgTheme.textSecondaryLight);
+        ? (isDark ? RpgTheme.accentDark : Colors.white)
+        : (isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight);
 
     return SafeArea(
       top: false,

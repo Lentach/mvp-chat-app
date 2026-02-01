@@ -27,6 +27,20 @@
 
 ---
 
+## ✅ RECENT CHANGE - Dark Mode Delete Account Palette (2026-02-01)
+
+**Design:** Dark mode uses the same color palette as the Delete Account dialog: reddish-pink (#FF6666) as primary accent instead of gold; borders/secondary in the same family (borderDark, mutedDark, etc.) instead of purple. Light mode unchanged.
+
+**Changes:**
+- **RpgTheme:** New dark-only constants: `accentDark`, `borderDark`, `mutedDark`, `buttonBgDark`, `activeTabBgDark`, `tabBorderDark`, `convItemBorderDark`, `timeColorDark`, `settingsTileBgDark`, `settingsTileBorderDark`. Dark `themeData` uses these for ColorScheme.primary/secondary, appBar, inputs, buttons, listTile, divider, textTheme. `primaryColor(context)` returns `accentDark` when dark.
+- **Settings screen:** In dark mode, tiles use warning-box style: background `settingsTileBgDark` (accent @ 0.1 alpha), border `settingsTileBorderDark`.
+- **Widgets:** All dark-branch usages of gold/purple/mutedText/border/convItemBorder/timeColor replaced with new dark constants or colorScheme.primary. DeleteAccountDialog uses `RpgTheme.accentDark` and `settingsTileBgDark`/`settingsTileBorderDark` for consistency.
+- **rpgInputDecoration:** Dark mode icon color uses `mutedDark`.
+
+**Plan:** `docs/plans/2026-02-01-dark-mode-delete-account-palette.md` (design + implementation)
+
+---
+
 ## ✅ RECENT CHANGE - Light/Dark Theme + Online Indicator (2026-02-01)
 
 **Theme:**
@@ -107,14 +121,12 @@ mvp-chat-app/
   docker-compose.yml
 ```
 
-**Run locally:**
+**Run locally (always use Docker):**
 ```bash
 # Create .env with CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 docker-compose up --build
-# OR separately:
-cd backend && npm run start:dev        # needs local PostgreSQL + .env
-cd frontend && flutter run -d chrome
 ```
+- **Do NOT run** `flutter run -d chrome` or `npm run start:dev` for normal use — that spins up a second frontend/backend and causes confusion (two backends, wrong data). Use Docker only; frontend is served on :8080 via nginx.
 
 **⚠️ IMPORTANT:** Before running, ensure no other instances are running:
 ```bash
@@ -323,6 +335,8 @@ if (records.length > 0) {
 
 **Problem:** Frontend shows different data than backend logs suggest.
 **Root cause:** Multiple backend instances running on same port (Docker + local).
+
+**Rule:** Always run the app via Docker (`docker-compose up --build`). Do NOT run `flutter run -d chrome` or `npm run start:dev` for normal use — that creates a second frontend/backend and leads to two backends and wrong data.
 
 **How to detect:**
 - Frontend logs show userId X connecting
@@ -583,7 +597,7 @@ main.dart → AuthGate (watches AuthProvider.isLoggedIn)
 ### Theme System
 
 - **Light/Dark:** `RpgTheme.themeDataLight` (light) and `RpgTheme.themeData` (dark). main.dart uses theme/themedataLight and darkTheme/themedata; ThemeMode from SettingsProvider (default preference: dark).
-- **Colors:** RPG palette dark (background #0A0A2E, gold #FFCC00, purple #7B7BF5); light palette (backgroundLight, boxBgLight, textColorLight, etc.) for themeDataLight.
+- **Colors:** Dark mode uses Delete Account palette (accent #FF6666, borderDark, mutedDark, etc.); light palette (backgroundLight, boxBgLight, primaryLight #4A154B, etc.) for themeDataLight. Backgrounds in dark unchanged (#0A0A2E, #0F0F3D).
 - **Fonts:**
   - `pressStart2P()` — retro font for titles/headers/logos ONLY
   - `bodyFont()` — readable Inter font for body text, messages, form fields

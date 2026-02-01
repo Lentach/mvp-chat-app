@@ -22,12 +22,12 @@ class _AuthScreenState extends State<AuthScreen> {
     final primaryColor = colorScheme.primary;
     final inputBg = isDark ? RpgTheme.inputBg : RpgTheme.inputBgLight;
     final tabBorderColor =
-        isDark ? RpgTheme.tabBorder : RpgTheme.tabBorderLight;
+        isDark ? RpgTheme.tabBorderDark : RpgTheme.tabBorderLight;
     final activeTabBg =
-        isDark ? RpgTheme.activeTabBg : RpgTheme.activeTabBgLight;
-    final activeTextColor = isDark ? RpgTheme.gold : Colors.white;
+        isDark ? RpgTheme.activeTabBgDark : RpgTheme.activeTabBgLight;
+    final activeTextColor = isDark ? RpgTheme.accentDark : Colors.white;
     final mutedColor =
-        isDark ? RpgTheme.mutedText : RpgTheme.textSecondaryLight;
+        isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
     return Scaffold(
       body: SafeArea(

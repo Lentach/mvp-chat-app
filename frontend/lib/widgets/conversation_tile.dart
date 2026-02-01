@@ -35,8 +35,8 @@ class ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = RpgTheme.isDark(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final activeBg = isDark ? RpgTheme.activeTabBg : RpgTheme.activeTabBgLight;
-    final secondaryColor = isDark ? RpgTheme.mutedText : RpgTheme.textSecondaryLight;
+    final activeBg = isDark ? RpgTheme.activeTabBgDark : RpgTheme.activeTabBgLight;
+    final secondaryColor = isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
     return Material(
       color: isActive ? activeBg : Colors.transparent,

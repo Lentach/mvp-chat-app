@@ -26,11 +26,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     final chat = context.watch<ChatProvider>();
     final isDark = RpgTheme.isDark(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final cardBg = isDark ? RpgTheme.convItemBg : RpgTheme.convItemBgLight;
-    final borderColor = isDark ? RpgTheme.border : RpgTheme.convItemBorderLight;
+    final cardBg = isDark ? RpgTheme.convItemBgDark : colorScheme.surface;
+    final borderColor = isDark
+        ? RpgTheme.borderDark
+        : colorScheme.outline.withValues(alpha: 0.5);
     final textColor = colorScheme.onSurface;
     final secondaryColor =
-        isDark ? RpgTheme.border : RpgTheme.textSecondaryLight;
+        isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
     // Listen for pending open conversation to navigate
     final pendingId = chat.consumePendingOpen();
@@ -47,7 +49,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
       appBar: AppBar(
         title: Text(
           'Friend Requests',
-          style: RpgTheme.pressStart2P(fontSize: 14),
+          style: RpgTheme.pressStart2P(
+            fontSize: 14,
+            color: colorScheme.primary,
+          ),
         ),
       ),
       body: Consumer<ChatProvider>(

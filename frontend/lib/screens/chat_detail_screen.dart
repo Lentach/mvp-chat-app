@@ -131,7 +131,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final messagesAreaBg =
         isDark ? RpgTheme.messagesAreaBg : RpgTheme.messagesAreaBgLight;
     final mutedColor =
-        isDark ? RpgTheme.mutedText : RpgTheme.textSecondaryLight;
+        isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
     final body = Column(
       children: [
@@ -179,7 +179,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final otherUser = _getOtherUser();
     if (widget.isEmbedded) {
       final borderColor = isDark
-          ? RpgTheme.convItemBorder
+          ? RpgTheme.convItemBorderDark
           : RpgTheme.convItemBorderLight;
       return Column(
         children: [

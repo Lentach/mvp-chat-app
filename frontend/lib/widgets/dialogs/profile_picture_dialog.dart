@@ -9,9 +9,9 @@ class ProfilePictureDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = RpgTheme.isDark(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final borderColor = isDark ? RpgTheme.border : RpgTheme.convItemBorderLight;
+    final borderColor = isDark ? RpgTheme.borderDark : RpgTheme.convItemBorderLight;
     final mutedColor =
-        isDark ? RpgTheme.mutedText : RpgTheme.textSecondaryLight;
+        isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
     return Dialog(
       backgroundColor: colorScheme.surface,

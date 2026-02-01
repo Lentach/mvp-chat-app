@@ -23,13 +23,13 @@ class ChatMessageBubble extends StatelessWidget {
         ? (isDark ? RpgTheme.mineMsgBg : RpgTheme.mineMsgBgLight)
         : (isDark ? RpgTheme.theirsMsgBg : RpgTheme.theirsMsgBgLight);
     final borderColor = isMine
-        ? (isDark ? RpgTheme.gold : RpgTheme.primaryLight)
-        : (isDark ? RpgTheme.purple : RpgTheme.primaryLight);
+        ? (isDark ? RpgTheme.accentDark : RpgTheme.primaryLight)
+        : (isDark ? RpgTheme.borderDark : RpgTheme.primaryLight);
     final textColor = isMine
         ? (isDark ? RpgTheme.textColor : Colors.white)
         : (isDark ? RpgTheme.textColor : RpgTheme.textColorLight);
     final timeColor =
-        isDark ? RpgTheme.timeColor : RpgTheme.textSecondaryLight;
+        isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight;
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
