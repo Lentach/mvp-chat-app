@@ -98,7 +98,7 @@ class ConversationTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   IconButton(
                     icon: const Icon(Icons.delete_outline, size: 18),
-                    color: RpgTheme.logoutRed,
+                    color: RpgTheme.accentDark,
                     onPressed: onDelete,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),

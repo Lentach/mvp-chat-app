@@ -46,6 +46,15 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _handleIncomingMessage(dynamic data) {
+    final msg = MessageModel.fromJson(data as Map<String, dynamic>);
+    _lastMessages[msg.conversationId] = msg;
+    if (msg.conversationId == _activeConversationId) {
+      _messages.add(msg);
+    }
+    notifyListeners();
+  }
+
   int? consumePendingOpen() {
     final id = _pendingOpenConversationId;
     _pendingOpenConversationId = null;
@@ -145,24 +154,8 @@ class ChatProvider extends ChangeNotifier {
             .toList();
         notifyListeners();
       },
-      onMessageSent: (data) {
-        final msg =
-            MessageModel.fromJson(data as Map<String, dynamic>);
-        _lastMessages[msg.conversationId] = msg;
-        if (msg.conversationId == _activeConversationId) {
-          _messages.add(msg);
-        }
-        notifyListeners();
-      },
-      onNewMessage: (data) {
-        final msg =
-            MessageModel.fromJson(data as Map<String, dynamic>);
-        _lastMessages[msg.conversationId] = msg;
-        if (msg.conversationId == _activeConversationId) {
-          _messages.add(msg);
-        }
-        notifyListeners();
-      },
+      onMessageSent: _handleIncomingMessage,
+      onNewMessage: _handleIncomingMessage,
       onOpenConversation: (data) {
         final convId = (data as Map<String, dynamic>)['conversationId'] as int;
         _pendingOpenConversationId = convId;

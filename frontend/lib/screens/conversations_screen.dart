@@ -113,7 +113,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                 'Delete',
                 style: RpgTheme.bodyFont(
                   fontSize: 14,
-                  color: RpgTheme.logoutRed,
+                  color: RpgTheme.accentDark,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -187,7 +187,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             tooltip: 'Settings',
           ),
           IconButton(
-            icon: const Icon(Icons.logout, color: RpgTheme.logoutRed),
+            icon: const Icon(Icons.logout, color: RpgTheme.accentDark),
             onPressed: _logout,
             tooltip: 'Logout',
           ),
@@ -292,7 +292,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       IconButton(
                         icon: const Icon(
                           Icons.logout,
-                          color: RpgTheme.logoutRed,
+                          color: RpgTheme.accentDark,
                           size: 20,
                         ),
                         onPressed: _logout,

@@ -26,7 +26,7 @@
 
 **Stack:** NestJS + Flutter + PostgreSQL + Socket.IO + JWT. 1-on-1 chat.
 
-**Structure:** `backend/` :3000, `frontend/` :8080 (nginx in Docker).
+**Structure:** `backend/` :3000, `frontend/` :8080 (nginx in Docker). Manual E2E scripts in `scripts/` (see `scripts/README.md`).
 
 **Run:**
 ```bash
@@ -103,6 +103,8 @@ await repo.remove(records);
 
 ## 7. Recent Changes (2026-02-01)
 
+**Code review / shipping cleanup:** Removed dead RpgTheme colors (gold, purple, border, labelText, tabBg, tabBorder, activeTabBg, buttonBg, buttonHoverBg, headerGreen, logoutRed, convItemBg, convItemBorder, outerBorder, timeColor). Replaced `logoutRed` usages with `accentDark` (same value). Deduplicated ChatProvider message handling: single `_handleIncomingMessage` for `onMessageSent` and `onNewMessage`. Moved manual E2E scripts from repo root and `backend/` into `scripts/` with `scripts/README.md`.
+
 **Delete account cascade:** User had no TypeORM cascade. deleteAccount now: (1) messages in user's convs, (2) conversations (userOne/userTwo), (3) friend_requests (sender/receiver), (4) user. UsersModule: Conversation, Message, FriendRequest repos.
 
 **Avatar update fix:** Cloudinary overwrite uses same public_id. Only deleteAvatar when oldPublicId !== newPublicId. Camera icon → gallery directly (ProfilePictureDialog removed).
@@ -152,6 +154,7 @@ No user search. No typing/read receipts. No message edit/delete. No unique on (s
 
 ## 11. Tech Debt
 
+- Manual E2E scripts in `scripts/` (see `scripts/README.md`). Run with Node against a running backend; not part of the shipped app.
 - Tests: 9 tests (AppConstants, UserModel, ConversationModel, widget). `flutter test`
 - Magic numbers: extracted to `lib/constants/app_constants.dart` (layoutBreakpointDesktop, conversationsRefreshDelay, messagePageSize, reconnect*)
 - WebSocket reconnection: implemented with exponential backoff (max 5 attempts). ChatProvider stores token for reconnect; onDisconnect triggers reconnect unless intentional (logout)

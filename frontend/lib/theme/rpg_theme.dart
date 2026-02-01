@@ -2,34 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class RpgTheme {
-  // Colors
   static const Color background = Color(0xFF0A0A2E);
   static const Color boxBg = Color(0xFF0F0F3D);
-  static const Color gold = Color(0xFFFFCC00);
-  static const Color purple = Color(0xFF7B7BF5);
-  static const Color border = Color(0xFF4A4AE0);
   static const Color inputBg = Color(0xFF0A0A24);
   static const Color textColor = Color(0xFFE0E0E0);
   static const Color mutedText = Color(0xFF6A6AB0);
-  static const Color labelText = Color(0xFF9999DD);
-  static const Color tabBg = Color(0xFF1A1A4E);
-  static const Color tabBorder = Color(0xFF3A3A8A);
-  static const Color activeTabBg = Color(0xFF2A2A8E);
-  static const Color buttonBg = Color(0xFF2A2A8E);
-  static const Color buttonHoverBg = Color(0xFF3A3A9E);
   static const Color errorColor = Color(0xFFFF4444);
   static const Color successColor = Color(0xFF44FF44);
-  static const Color headerGreen = Color(0xFF44FF44);
-  static const Color logoutRed = Color(0xFFFF6666);
-  static const Color convItemBg = Color(0xFF1A1A4E);
-  static const Color convItemBorder = Color(0xFF2A2A6E);
   static const Color messagesAreaBg = Color(0xFF08081E);
   static const Color mineMsgBg = Color(0xFF1A1A50);
   static const Color theirsMsgBg = Color(0xFF121240);
-  static const Color outerBorder = Color(0xFF2A2A7A);
-  static const Color timeColor = Color(0xFF5555AA);
 
-  // Dark mode – Delete Account palette (primary accent, borders, muted)
+  // Dark mode – primary accent, borders, muted
   static const Color accentDark = Color(0xFFFF6666);
   static const Color borderDark = Color(0xFFCC5555);
   static const Color mutedDark = Color(0xFF9A8A8A);
@@ -39,9 +23,8 @@ class RpgTheme {
   static const Color convItemBorderDark = Color(0xFF5A3535);
   static const Color convItemBgDark = Color(0xFF1E1515);
   static const Color timeColorDark = Color(0xFF9A7A7A);
-  // Settings tiles in dark: same as Delete Account warning box
   static Color get settingsTileBgDark => accentDark.withValues(alpha: 0.1);
-  static const Color settingsTileBorderDark = Color(0xFFFF6666);
+  static const Color settingsTileBorderDark = accentDark;
 
   // Light theme palette - modern neutral (Slack-inspired)
   static const Color primaryLight = Color(0xFF4A154B);
