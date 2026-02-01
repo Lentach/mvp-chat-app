@@ -4,14 +4,15 @@ import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
+import '../widgets/avatar_circle.dart';
 import '../widgets/conversation_tile.dart';
+import 'add_or_invitations_screen.dart';
 import 'chat_detail_screen.dart';
-import 'new_chat_screen.dart';
-import 'settings_screen.dart';
-import 'friend_requests_screen.dart';
 
 class ConversationsScreen extends StatefulWidget {
-  const ConversationsScreen({super.key});
+  final VoidCallback? onAvatarTap;
+
+  const ConversationsScreen({super.key, this.onAvatarTap});
 
   @override
   State<ConversationsScreen> createState() => _ConversationsScreenState();
@@ -26,11 +27,6 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       final chat = context.read<ChatProvider>();
       chat.connect(token: auth.token!, userId: auth.currentUser!.id);
     });
-  }
-
-  void _logout() {
-    context.read<ChatProvider>().disconnect();
-    context.read<AuthProvider>().logout();
   }
 
   void _openChat(int conversationId) {
@@ -49,22 +45,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   void _startNewChat() async {
     final result = await Navigator.of(context).push<int>(
-      MaterialPageRoute(builder: (_) => const NewChatScreen()),
-    );
-    if (result != null && mounted) {
-      _openChat(result);
-    }
-  }
-
-  void _openSettings() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-    );
-  }
-
-  void _openFriendRequests() async {
-    final result = await Navigator.of(context).push<int>(
-      MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
+      MaterialPageRoute(builder: (_) => const AddOrInvitationsScreen()),
     );
     if (result != null && mounted) {
       _openChat(result);
@@ -138,72 +119,110 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        _buildCustomHeader(),
+        Expanded(child: _buildConversationList()),
+      ],
+    );
+  }
+
+  Widget _buildCustomHeader() {
+    final auth = context.watch<AuthProvider>();
     final colorScheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'RPG CHAT',
-          style: RpgTheme.pressStart2P(fontSize: 14, color: colorScheme.primary),
+    final user = auth.currentUser;
+    final isDark = RpgTheme.isDark(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark
+                ? RpgTheme.convItemBorderDark
+                : RpgTheme.convItemBorderLight,
+          ),
         ),
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: Icon(Icons.person_add, color: colorScheme.primary),
-                onPressed: _openFriendRequests,
-                tooltip: 'Friend requests',
-              ),
-              Consumer<ChatProvider>(
-                builder: (context, chat, _) {
-                  if (chat.pendingRequestsCount == 0) {
-                    return const SizedBox.shrink();
-                  }
-                  return Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${chat.pendingRequestsCount}',
-                        style: RpgTheme.bodyFont(
-                          fontSize: 10,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          IconButton(
-            icon: Icon(Icons.settings, color: colorScheme.primary),
-            onPressed: _openSettings,
-            tooltip: 'Settings',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: RpgTheme.accentDark),
-            onPressed: _logout,
-            tooltip: 'Logout',
-          ),
-        ],
       ),
-      body: _buildConversationList(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _startNewChat,
-        child: const Icon(Icons.chat_bubble_outline),
+      child: SafeArea(
+        bottom: false,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Centered title (always in the middle of the header)
+            Center(
+              child: Text(
+                'Conversations',
+                style: RpgTheme.pressStart2P(
+                  fontSize: 12,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ),
+            // Left: avatar (tap to go to Settings)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: GestureDetector(
+                onTap: widget.onAvatarTap,
+                child: AvatarCircle(
+                  email: user?.email ?? '',
+                  radius: 22,
+                  profilePictureUrl: user?.profilePictureUrl,
+                ),
+              ),
+            ),
+            // Right: plus in circle with badge (badge only on plus, not on avatar)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.add_circle_outline,
+                      color: colorScheme.primary,
+                      size: 28,
+                    ),
+                    onPressed: _startNewChat,
+                    tooltip: 'Add / Invitations',
+                  ),
+                  Consumer<ChatProvider>(
+                    builder: (context, chat, _) {
+                      if (chat.pendingRequestsCount == 0) {
+                        return const SizedBox.shrink();
+                      }
+                      return Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${chat.pendingRequestsCount}',
+                            style: RpgTheme.bodyFont(
+                              fontSize: 10,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildDesktopLayout() {
     final chat = context.watch<ChatProvider>();
-    final colorScheme = Theme.of(context).colorScheme;
     final isDark = RpgTheme.isDark(context);
     final borderColor =
         isDark ? RpgTheme.convItemBorderDark : RpgTheme.convItemBorderLight;
@@ -216,90 +235,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(
-                    color: colorScheme.surface,
+                    color: Theme.of(context).colorScheme.surface,
                     border: Border(bottom: BorderSide(color: borderColor)),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'RPG CHAT',
-                          style: RpgTheme.pressStart2P(
-                            fontSize: 12,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.chat_bubble_outline,
-                          color: colorScheme.primary,
-                          size: 20,
-                        ),
-                        onPressed: _startNewChat,
-                        tooltip: 'New chat',
-                      ),
-                      Stack(
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.person_add,
-                              color: colorScheme.primary,
-                              size: 20,
-                            ),
-                            onPressed: _openFriendRequests,
-                            tooltip: 'Friend requests',
-                          ),
-                          Consumer<ChatProvider>(
-                            builder: (context, chat, _) {
-                              if (chat.pendingRequestsCount == 0) {
-                                return const SizedBox.shrink();
-                              }
-                              return Positioned(
-                                right: 6,
-                                top: 6,
-                                child: Container(
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    '${chat.pendingRequestsCount}',
-                                    style: RpgTheme.bodyFont(
-                                      fontSize: 8,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.settings,
-                          color: colorScheme.primary,
-                          size: 20,
-                        ),
-                        onPressed: _openSettings,
-                        tooltip: 'Settings',
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.logout,
-                          color: RpgTheme.accentDark,
-                          size: 20,
-                        ),
-                        onPressed: _logout,
-                        tooltip: 'Logout',
-                      ),
-                    ],
-                  ),
+                  child: _buildCustomHeader(),
                 ),
                 Expanded(child: _buildConversationList()),
               ],
@@ -376,10 +317,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       );
     }
 
+    final borderColor =
+        isDark ? RpgTheme.convItemBorderDark : RpgTheme.convItemBorderLight;
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       itemCount: conversations.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 2),
+      separatorBuilder: (_, index) => Divider(
+        height: 1,
+        color: borderColor,
+      ),
       itemBuilder: (context, index) {
         final conv = conversations[index];
         final otherUser = chat.getOtherUser(conv);

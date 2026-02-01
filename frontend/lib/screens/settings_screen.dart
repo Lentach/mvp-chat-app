@@ -211,12 +211,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        centerTitle: true,
         title: Text(
           'Settings',
-          style: RpgTheme.bodyFont(
-            fontSize: 18,
+          style: RpgTheme.pressStart2P(
+            fontSize: 12,
             color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w600,
           ),
         ),
         backgroundColor: theme.colorScheme.surface,
@@ -347,7 +347,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: () {
                   chat.disconnect();
                   auth.logout();
-                  Navigator.pop(context);
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.pop(context);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: RpgTheme.accentDark,

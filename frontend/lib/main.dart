@@ -4,7 +4,7 @@ import 'providers/auth_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/settings_provider.dart';
 import 'screens/auth_screen.dart';
-import 'screens/conversations_screen.dart';
+import 'screens/main_shell.dart';
 import 'theme/rpg_theme.dart';
 
 void main() {
@@ -64,7 +64,7 @@ class _AuthGateState extends State<AuthGate> {
     _previousLoggedInState = auth.isLoggedIn;
 
     if (auth.isLoggedIn) {
-      return const ConversationsScreen();
+      return const MainShell();
     }
     return const AuthScreen();
   }
