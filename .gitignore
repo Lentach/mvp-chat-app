@@ -3,6 +3,9 @@ dist/
 .env
 *.log
 
+# User uploads (profile pictures)
+backend/uploads/
+
 # Flutter
 frontend/build/
 frontend/.dart_tool/
