@@ -13,9 +13,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UsersService } from './users.service';
 import {
   ResetPasswordDto,
@@ -27,22 +27,17 @@ import {
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);
 
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private cloudinaryService: CloudinaryService,
+  ) {}
 
   @Post('profile-picture')
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 3600000 } })
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/profiles',
-        filename: (req, file, cb) => {
-          const userId = req.user?.['id'] || 'unknown';
-          const timestamp = Date.now();
-          const ext = extname(file.originalname);
-          cb(null, `user-${userId}-${timestamp}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
       fileFilter: (req, file, cb) => {
         if (!file.mimetype.match(/^image\/(jpeg|png)$/)) {
           return cb(
@@ -66,15 +61,20 @@ export class UsersController {
     }
 
     const userId = req.user.id;
-    const relativePath = `/uploads/profiles/${file.filename}`;
 
-    this.logger.debug(
-      `User ${userId} uploaded profile picture: ${relativePath}`,
-    );
+    const { secureUrl, publicId } =
+      await this.cloudinaryService.uploadAvatar(
+        userId,
+        file.buffer,
+        file.mimetype,
+      );
+
+    this.logger.debug(`User ${userId} uploaded profile picture to Cloudinary`);
 
     const user = await this.usersService.updateProfilePicture(
       userId,
-      relativePath,
+      secureUrl,
+      publicId,
     );
 
     return {

@@ -8,13 +8,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './user.entity';
-import * as fs from 'fs/promises';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    private cloudinaryService: CloudinaryService,
   ) {}
 
   async create(email: string, password: string, username?: string): Promise<User> {
@@ -60,23 +61,23 @@ export class UsersService {
       .getOne();
   }
 
-  async updateProfilePicture(userId: number, url: string): Promise<User> {
+  async updateProfilePicture(
+    userId: number,
+    secureUrl: string,
+    publicId: string,
+  ): Promise<User> {
     const user = await this.findById(userId);
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    // Delete old profile picture if exists
-    if (user.profilePictureUrl) {
-      try {
-        const oldPath = `.${user.profilePictureUrl}`;
-        await fs.unlink(oldPath);
-      } catch (error) {
-        // File might not exist, continue
-      }
+    // Delete old Cloudinary avatar if exists (has publicId = stored in Cloudinary)
+    if (user.profilePicturePublicId) {
+      await this.cloudinaryService.deleteAvatar(user.profilePicturePublicId);
     }
 
-    user.profilePictureUrl = url;
+    user.profilePictureUrl = secureUrl;
+    user.profilePicturePublicId = publicId;
     return this.usersRepo.save(user);
   }
 
@@ -114,14 +115,9 @@ export class UsersService {
       throw new UnauthorizedException('Invalid password');
     }
 
-    // Delete profile picture if exists
-    if (user.profilePictureUrl) {
-      try {
-        const picturePath = `.${user.profilePictureUrl}`;
-        await fs.unlink(picturePath);
-      } catch (error) {
-        // File might not exist, continue
-      }
+    // Delete Cloudinary avatar if exists
+    if (user.profilePicturePublicId) {
+      await this.cloudinaryService.deleteAvatar(user.profilePicturePublicId);
     }
 
     // TypeORM cascades will delete related records

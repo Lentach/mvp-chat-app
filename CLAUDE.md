@@ -1,6 +1,6 @@
 # CLAUDE.md - MVP Chat App Knowledge Base
 
-**Last updated:** 2026-01-31
+**Last updated:** 2026-02-01
 
 **MANDATORY RULE: Keep This File Up To Date**
 
@@ -8,26 +8,20 @@
 
 ---
 
-## ✅ RECENTLY FIXED - Avatar Upload
+## ✅ RECENT CHANGE - Cloudinary Avatar Storage (2026-02-01)
 
-**BUG (FIXED - 2026-01-31):** Profile picture upload showed success message but avatar didn't change.
+**Migrated:** Profile pictures from local disk to Cloudinary cloud storage.
 
-**Root causes:** Two separate bugs:
-1. **Frontend:** `AvatarCircle` widget had internal `_imageLoadError` state that didn't reset when `profilePictureUrl` changed → showed old cached image
-2. **Backend/Frontend:** Nginx configuration missing `/uploads/` route → returned `index.html` (1235 bytes) instead of actual image files
+**Changes:**
+- Avatars are uploaded to Cloudinary (free tier: 25 GB storage, 25 GB bandwidth/month)
+- Backend uses `cloudinary` npm package, Multer `memoryStorage`, `CloudinaryService`
+- Database: `profilePictureUrl` stores full Cloudinary URL; `profilePicturePublicId` stores public_id for deletion
+- Frontend `AvatarCircle`: handles both absolute URLs (Cloudinary) and relative paths (legacy)
+- Removed: local `./uploads/` storage, nginx `/uploads/` proxy, Docker uploads volume
 
-**Fixes applied:**
-1. **AvatarCircle** (`frontend/lib/widgets/avatar_circle.dart`):
-   - Added `didUpdateWidget()` method to detect when `profilePictureUrl` prop changes
-   - Resets `_imageLoadError = false` when URL changes → forces widget rebuild with new image
-
-2. **Nginx** (`frontend/nginx.conf`):
-   - Added `location /uploads/` block that proxies to `http://backend:3000/uploads/`
-   - Nginx now properly serves static files instead of returning SPA index.html
-
-**Files modified:**
-- `frontend/lib/widgets/avatar_circle.dart` — Added `didUpdateWidget()` method
-- `frontend/nginx.conf` — Added `/uploads/` location proxy
+**Required setup:** Create `.env` in project root (or set in docker-compose) with:
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+- Get from [cloudinary.com](https://cloudinary.com) Dashboard → API Keys
 
 ---
 
@@ -83,9 +77,10 @@ mvp-chat-app/
 
 **Run locally:**
 ```bash
+# Create .env with CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 docker-compose up --build
 # OR separately:
-cd backend && npm run start:dev        # needs local PostgreSQL
+cd backend && npm run start:dev        # needs local PostgreSQL + .env
 cd frontend && flutter run -d chrome
 ```
 
@@ -119,6 +114,7 @@ cd frontend && flutter build web
 | Module | Purpose |
 |--------|---------|
 | **AuthModule** | POST /auth/register, POST /auth/login with JWT + bcrypt |
+| **CloudinaryModule** | Avatar upload/delete to Cloudinary cloud storage |
 | **UsersModule** | User entity, shared dependency |
 | **FriendsModule** | Friend request system (PENDING/ACCEPTED/REJECTED) |
 | **ConversationsModule** | 1-on-1 conversation linking two users (no duplicates via findOrCreate) |
@@ -151,7 +147,8 @@ users
   ├─ email (unique)
   ├─ username (unique)
   ├─ password (bcrypt)
-  ├─ profilePictureUrl (nullable)
+  ├─ profilePictureUrl (nullable) — full Cloudinary URL or legacy relative path
+  ├─ profilePicturePublicId (nullable) — Cloudinary public_id for deletion
   ├─ activeStatus (boolean, default: true)
   └─ createdAt
 
@@ -344,7 +341,7 @@ if (records.length > 0) {
 
 | Endpoint | Method | Body | Response |
 |----------|--------|------|----------|
-| /users/profile-picture | POST | `multipart/form-data {file}` | `{profilePictureUrl}` |
+| /users/profile-picture | POST | `multipart/form-data {file}` | `{profilePictureUrl}` (Cloudinary URL) |
 | /users/reset-password | POST | `{oldPassword, newPassword}` | `200 OK` |
 | /users/account | DELETE | `{password}` | `200 OK` |
 | /users/active-status | PATCH | `{activeStatus}` | `200 OK` |
@@ -407,13 +404,12 @@ if (records.length > 0) {
 - Services injected via constructor, receive server and onlineUsers Map as parameters
 
 ✅ **User Settings Feature (Phase 1 & 2 - 2026-01-31)**
-**Backend (Phase 1):**
-- Added `profilePictureUrl` (varchar, nullable) and `activeStatus` (boolean, default: true) columns to users table
+**Backend (Phase 1 + Cloudinary 2026-02-01):**
+- Added `profilePictureUrl` (varchar, nullable), `profilePicturePublicId` (nullable), `activeStatus` (boolean, default: true) to users table
 - Created `UsersController` with 4 new REST endpoints (profile picture, reset password, delete account, active status)
 - Created 3 new DTOs: `ResetPasswordDto`, `DeleteAccountDto`, `UpdateActiveStatusDto`
-- Configured Multer for file upload: JPEG/PNG only, max 5MB, stored in `./uploads/profiles/`
-- Added static file serving in `main.ts` at `/uploads/` prefix
-- Added Docker volume mount: `./backend/uploads:/app/uploads`
+- Profile pictures: Multer memoryStorage → Cloudinary upload (JPEG/PNG only, max 5MB)
+- CloudinaryModule + CloudinaryService for upload/delete
 - Updated `AuthService.login()` to include `profilePictureUrl` and `activeStatus` in JWT payload
 - Updated `JwtStrategy.validate()` to extract new user fields from JWT
 - Added WebSocket handler `updateActiveStatus` in `ChatFriendRequestService` → broadcasts `userStatusChanged` to all friends
@@ -489,7 +485,11 @@ if (records.length > 0) {
 ### Modify settings screen
 - UI and layout: `frontend/lib/screens/settings_screen.dart`
 - Dialogs: `frontend/lib/widgets/dialogs/` (reset_password_dialog, delete_account_dialog, profile_picture_dialog)
-- Avatar with profile picture: `frontend/lib/widgets/avatar_circle.dart`
+- Avatar with profile picture: `frontend/lib/widgets/avatar_circle.dart` — handles absolute URLs (Cloudinary) and relative paths via `_buildImageUrl()`
+
+### Modify avatar storage (Cloudinary)
+- Service: `backend/src/cloudinary/cloudinary.service.ts` — uploadAvatar(), deleteAvatar()
+- Controller: `backend/src/users/users.controller.ts` — uploadProfilePicture uses memoryStorage + CloudinaryService
 
 ### Add new user management endpoint
 1. Add method to `backend/src/users/users.service.ts`
@@ -512,6 +512,9 @@ if (records.length > 0) {
 | `DB_PASS` | postgres | ✓ | PostgreSQL password |
 | `DB_NAME` | chat_db | ✓ | Database name |
 | `JWT_SECRET` | (none) | ✓ | JWT signing key — startup fails if missing |
+| `CLOUDINARY_CLOUD_NAME` | (none) | ✓ | Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | (none) | ✓ | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | (none) | ✓ | Cloudinary API secret |
 | `NODE_ENV` | development | — | Affects database `synchronize` and logging |
 | `PORT` | 3000 | — | Backend server port |
 | `ALLOWED_ORIGINS` | http://localhost:3000 | — | CORS origins (comma-separated) |
@@ -575,9 +578,10 @@ device_info_plus: ^11.5.0           # Device name for settings screen
 
 **Backend:**
 ```
-multer                              # File upload middleware
+cloudinary                          # Cloud storage for avatars
+multer                              # File upload middleware (memoryStorage)
 @types/multer                       # TypeScript types for multer
-@nestjs/platform-express            # Express platform for NestJS (static files)
+@nestjs/platform-express            # Express platform for NestJS
 ```
 
 ---
@@ -591,7 +595,7 @@ multer                              # File upload middleware
 - ❌ No last message in `conversationsList` — track client-side
 - ❌ No database unique constraint on user pair (deduplication in `findOrCreate`)
 - ❌ No unique constraint on (sender, receiver) in friend_requests (intentional, allows resend)
-- ❌ Profile pictures stored locally in `./uploads/` (not cloud storage like S3)
+- ✅ Profile pictures stored in Cloudinary (free tier, CDN, works on web + mobile)
 
 ---
 

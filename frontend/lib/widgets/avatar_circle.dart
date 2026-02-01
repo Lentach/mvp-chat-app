@@ -34,6 +34,15 @@ class _AvatarCircleState extends State<AvatarCircle> {
     }
   }
 
+  String _buildImageUrl() {
+    final url = widget.profilePictureUrl;
+    if (url == null || url.trim().isEmpty) return '';
+    final isAbsolute =
+        url.startsWith('http://') || url.startsWith('https://');
+    final base = isAbsolute ? url : '${AppConfig.baseUrl}$url';
+    return '$base?t=${DateTime.now().millisecondsSinceEpoch}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final letter = widget.email.isNotEmpty ? widget.email[0].toUpperCase() : '?';
@@ -57,7 +66,7 @@ class _AvatarCircleState extends State<AvatarCircle> {
           child: widget.profilePictureUrl != null && !_imageLoadError
               ? ClipOval(
                   child: Image.network(
-                    '${AppConfig.baseUrl}${widget.profilePictureUrl}?t=${DateTime.now().millisecondsSinceEpoch}',
+                    _buildImageUrl(),
                     width: widget.radius * 2,
                     height: widget.radius * 2,
                     fit: BoxFit.cover,

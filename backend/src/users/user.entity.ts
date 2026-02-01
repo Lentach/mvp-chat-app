@@ -23,6 +23,9 @@ export class User {
   @Column({ nullable: true })
   profilePictureUrl: string;
 
+  @Column({ nullable: true })
+  profilePicturePublicId: string;
+
   @Column({ default: true })
   activeStatus: boolean;
 

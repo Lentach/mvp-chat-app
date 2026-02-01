@@ -34,6 +34,15 @@ export class EnvironmentVariables {
 
   @IsString()
   ALLOWED_ORIGINS: string = 'http://localhost:3000,http://localhost:8080';
+
+  @IsString()
+  CLOUDINARY_CLOUD_NAME: string;
+
+  @IsString()
+  CLOUDINARY_API_KEY: string;
+
+  @IsString()
+  CLOUDINARY_API_SECRET: string;
 }
 
 export function validate(config: Record<string, any>): EnvironmentVariables {

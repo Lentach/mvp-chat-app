@@ -8,7 +8,7 @@ import { UsersController } from './users.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
-    MulterModule.register({ dest: './uploads/profiles' }),
+    MulterModule.register(),
   ],
   controllers: [UsersController],
   providers: [UsersService],

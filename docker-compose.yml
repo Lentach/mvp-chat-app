@@ -25,8 +25,9 @@ services:
       DB_NAME: chatdb
       JWT_SECRET: my-super-secret-jwt-key-change-in-production
       ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8080,http://192.168.1.11:8080'
-    volumes:
-      - ./backend/uploads:/app/uploads
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     depends_on:
       - db
 
