@@ -1,10 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import '../config/app_config.dart';
+import '../constants/app_constants.dart';
 import '../models/conversation_model.dart';
-import '../models/message_model.dart';
 import '../models/friend_request_model.dart';
+import '../models/message_model.dart';
 import '../models/user_model.dart';
 import '../services/socket_service.dart';
-import '../config/app_config.dart';
 
 class ChatProvider extends ChangeNotifier {
   final SocketService _socketService = SocketService();
@@ -20,6 +23,10 @@ class ChatProvider extends ChangeNotifier {
   int _pendingRequestsCount = 0;
   List<UserModel> _friends = [];
   bool _friendRequestJustSent = false;
+  bool _intentionalDisconnect = false;
+  String? _tokenForReconnect;
+  int _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
 
   List<ConversationModel> get conversations => _conversations;
   List<MessageModel> get messages => _messages;
@@ -81,6 +88,11 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void connect({required String token, required int userId}) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _intentionalDisconnect = false;
+    _tokenForReconnect = token;
+
     // Clear ALL state before connecting to prevent data leakage between users
     _conversations = [];
     _messages = [];
@@ -108,10 +120,11 @@ class ChatProvider extends ChangeNotifier {
       baseUrl: AppConfig.baseUrl,
       token: token,
       onConnect: () {
+        _reconnectAttempts = 0; // Reset on successful connection
         _socketService.getConversations();
         _socketService.getFriendRequests();
         _socketService.getFriends();
-        Future.delayed(const Duration(milliseconds: 500), () {
+        Future.delayed(AppConstants.conversationsRefreshDelay, () {
           if (_conversations.isEmpty) {
             _socketService.getConversations();
           }
@@ -219,11 +232,11 @@ class ChatProvider extends ChangeNotifier {
         }
         notifyListeners();
       },
-      onDisconnect: (_) {},
+      onDisconnect: (_) => _onDisconnect(),
     );
   }
 
-  void openConversation(int conversationId, {int limit = 50}) {
+  void openConversation(int conversationId, {int limit = AppConstants.messagePageSize}) {
     _activeConversationId = conversationId;
     _messages = [];
     _socketService.getMessages(conversationId, limit: limit);
@@ -232,7 +245,7 @@ class ChatProvider extends ChangeNotifier {
 
   // Load more messages for the active conversation
   // Fetches messages with increased limit (current + additional)
-  void loadMoreMessages({int additionalLimit = 50}) {
+  void loadMoreMessages({int additionalLimit = AppConstants.messagePageSize}) {
     if (_activeConversationId == null) return;
     final newLimit = _messages.length + additionalLimit;
     _socketService.getMessages(_activeConversationId!, limit: newLimit);
@@ -306,6 +319,11 @@ class ChatProvider extends ChangeNotifier {
 
   void disconnect() {
     debugPrint('[ChatProvider] Disconnecting WebSocket');
+    _intentionalDisconnect = true;
+    _tokenForReconnect = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _reconnectAttempts = 0;
     _socketService.disconnect();
     _conversations = [];
     _messages = [];
@@ -318,5 +336,37 @@ class ChatProvider extends ChangeNotifier {
     _friends = [];
     _friendRequestJustSent = false;
     notifyListeners();
+  }
+
+  void _onDisconnect() {
+    if (_intentionalDisconnect || _tokenForReconnect == null || _currentUserId == null) {
+      return;
+    }
+    if (_reconnectAttempts >= AppConstants.reconnectMaxAttempts) {
+      debugPrint('[ChatProvider] Reconnect max attempts reached');
+      _errorMessage = 'Connection lost. Please refresh the page.';
+      notifyListeners();
+      return;
+    }
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    _reconnectAttempts++;
+    final delay = _reconnectDelay;
+    debugPrint('[ChatProvider] Scheduling reconnect attempt $_reconnectAttempts in ${delay.inSeconds}s');
+    _reconnectTimer = Timer(delay, () {
+      if (_intentionalDisconnect || _tokenForReconnect == null || _currentUserId == null) {
+        return;
+      }
+      debugPrint('[ChatProvider] Reconnecting WebSocket...');
+      connect(token: _tokenForReconnect!, userId: _currentUserId!);
+    });
+  }
+
+  Duration get _reconnectDelay {
+    final exponential = AppConstants.reconnectInitialDelay.inMilliseconds * (1 << (_reconnectAttempts - 1));
+    final capped = exponential.clamp(0, AppConstants.reconnectMaxDelay.inMilliseconds);
+    return Duration(milliseconds: capped);
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
@@ -37,7 +38,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     chat.openConversation(conversationId);
 
     final width = MediaQuery.of(context).size.width;
-    if (width < 600) {
+    if (width < AppConstants.layoutBreakpointDesktop) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ChatDetailScreen(conversationId: conversationId),
@@ -127,7 +128,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 600;
+        final isDesktop = constraints.maxWidth >= AppConstants.layoutBreakpointDesktop;
         if (isDesktop) {
           return _buildDesktopLayout();
         }

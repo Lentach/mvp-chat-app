@@ -9,12 +9,21 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from './user.entity';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { Conversation } from '../conversations/conversation.entity';
+import { Message } from '../messages/message.entity';
+import { FriendRequest } from '../friends/friend-request.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    @InjectRepository(Conversation)
+    private convRepo: Repository<Conversation>,
+    @InjectRepository(Message)
+    private messageRepo: Repository<Message>,
+    @InjectRepository(FriendRequest)
+    private friendRequestRepo: Repository<FriendRequest>,
     private cloudinaryService: CloudinaryService,
   ) {}
 
@@ -124,7 +133,29 @@ export class UsersService {
       await this.cloudinaryService.deleteAvatar(user.profilePicturePublicId);
     }
 
-    // TypeORM cascades will delete related records
+    // Delete dependent data first: messages → conversations → friend_requests (User entity has no cascade)
+    const conversations = await this.convRepo.find({
+      where: [
+        { userOne: { id: userId } },
+        { userTwo: { id: userId } },
+      ],
+    });
+
+    for (const conv of conversations) {
+      await this.messageRepo.delete({ conversation: { id: conv.id } });
+      await this.convRepo.delete({ id: conv.id });
+    }
+
+    const friendRequests = await this.friendRequestRepo.find({
+      where: [
+        { sender: { id: userId } },
+        { receiver: { id: userId } },
+      ],
+    });
+    if (friendRequests.length > 0) {
+      await this.friendRequestRepo.remove(friendRequests);
+    }
+
     await this.usersRepo.remove(user);
   }
 }

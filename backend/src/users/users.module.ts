@@ -4,9 +4,15 @@ import { MulterModule } from '@nestjs/platform-express';
 import { User } from './user.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { Conversation } from '../conversations/conversation.entity';
+import { Message } from '../messages/message.entity';
+import { FriendRequest } from '../friends/friend-request.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), MulterModule.register()],
+  imports: [
+    TypeOrmModule.forFeature([User, Conversation, Message, FriendRequest]),
+    MulterModule.register(),
+  ],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],
