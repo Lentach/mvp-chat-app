@@ -280,8 +280,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       email: auth.currentUser?.email ?? '',
                       radius: 60,
                       profilePictureUrl: auth.currentUser?.profilePictureUrl,
-                      showOnlineIndicator: _activeStatus,
-                      isOnline: _activeStatus,
+                      showOnlineIndicator: true,
+                      isOnline: _activeStatus && chat.socket.isConnected,
                     ),
                     Positioned(
                       bottom: 0,
