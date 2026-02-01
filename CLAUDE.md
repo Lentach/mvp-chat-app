@@ -30,9 +30,11 @@
 
 **Active status + green dot:**
 - **JWT:** AuthService.login() and JwtStrategy.validate() include `activeStatus` in payload/return so frontend gets it on login and from saved token.
-- **Backend:** All `friendsList` and `conversationsList` emissions now include `isOnline: onlineUsers.has(user.id)` (or per userOne/userTwo in conversations). getFriends and getConversations accept `onlineUsers`; ChatFriendRequestService and ChatConversationService enrich payloads with isOnline.
-- **Frontend:** UserModel has `isOnline` (bool?); AuthProvider sets `activeStatus` from JWT in login and _loadSavedToken. Settings screen init: _activeStatus synced from auth.currentUser?.activeStatus once in didChangeDependencies.
-- **Green dot:** Shown only when `activeStatus == true` **and** `isOnline == true`. ConversationTile and ChatDetailScreen pass `otherUser` (UserModel) to AvatarCircle with showOnlineIndicator and isOnline; Settings avatar shows dot only when _activeStatus is on. ChatProvider.getOtherUser(conv) added; onUserStatusChanged updates both _friends and _conversations so green dot updates in real time when a friend toggles status.
+- **Backend:** All `friendsList` and `conversationsList` emissions now include `isOnline: onlineUsers.has(user.id) && user.activeStatus` - green dot shows ONLY when user is BOTH connected via WebSocket AND has activeStatus enabled. Both `toConversationPayloadWithOnline()` methods (in chat-conversation.service.ts and chat-friend-request.service.ts) check BOTH conditions. All friendsList emissions (4 locations) also check BOTH conditions.
+- **Frontend:** UserModel has `isOnline` (bool?); AuthProvider sets `activeStatus` from JWT. SocketService has `isConnected` getter (`_socket != null && _socket!.connected`).
+- **Settings screen:** Own avatar shows `isOnline: _activeStatus && chat.socket.isConnected` - green dot only when toggle ON and WebSocket connected. Always shows indicator (`showOnlineIndicator: true`), but color depends on BOTH conditions.
+- **Green dot logic:** Shown only when `user.activeStatus == true` AND `onlineUsers.has(user.id) == true`. ConversationTile and ChatDetailScreen pass `otherUser` (UserModel) to AvatarCircle with `showOnlineIndicator: true` and `isOnline: (activeStatus && isOnline)` check from backend. ChatProvider.getOtherUser(conv) helper; onUserStatusChanged updates both _friends and _conversations so green dot updates in real time when a friend toggles status.
+- **Connection logging:** ChatProvider.connect() and disconnect() now log connection state for debugging.
 
 **After EVERY code change (bug fix, new feature, refactor, config change), update this file immediately.** This is the single source of truth for future agents.A future agent must be able to read ONLY this file and understand the current state of the project without reading every source file
 
