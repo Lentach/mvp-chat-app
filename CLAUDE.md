@@ -13,6 +13,20 @@
 
 ---
 
+## ✅ RECENT CHANGE - Avatar Update Fix + Gallery Direct (2026-02-01)
+
+**Bug fixed:** Avatar did not change after selecting a new photo in Settings — page refreshed but image stayed the same.
+
+**Root cause:** `UsersService.updateProfilePicture` called `deleteAvatar(user.profilePicturePublicId)` even when Cloudinary used the same `public_id` (avatars/user-X) with overwrite. This deleted the newly uploaded image.
+
+**Fix:** Only delete old avatar when `oldPublicId !== newPublicId`. For overwrite (same public_id), skip delete.
+
+**UI change:** Camera icon in Settings now opens gallery directly (no "Take a photo / Choose from gallery" dialog). `ProfilePictureDialog` removed.
+
+**Files:** `backend/src/users/users.service.ts`, `frontend/lib/screens/settings_screen.dart`; deleted `profile_picture_dialog.dart`.
+
+---
+
 ## ✅ RECENT CHANGE - Light Mode Color Renovation (2026-02-01)
 
 **Design:** Modern neutral palette (Slack-inspired). Purple accent #4A154B replaces gold in light mode. Soft grays (#F4F5F7 main, #FFFFFF surface), high-contrast text (#1D1C1D primary, #616061 secondary).
@@ -467,7 +481,7 @@ if (records.length > 0) {
 - Updated `ApiService` with 3 new methods matching backend endpoints
 - Completely redesigned `SettingsScreen` with 5 tiles: profile header, dark mode dropdown, privacy (coming soon), devices, reset password, delete account, logout button
 - Rewrote `AvatarCircle` as `StatefulWidget` with profile picture support, fallback to gradient, loading state
-- Created 3 new dialogs: `ResetPasswordDialog`, `DeleteAccountDialog`, `ProfilePictureDialog` (camera vs gallery)
+- Created 2 dialogs: `ResetPasswordDialog`, `DeleteAccountDialog` (ProfilePictureDialog removed — camera icon opens gallery directly)
 - Updated `main.dart` to include `SettingsProvider` in `MultiProvider` and consume dark mode preference
 - Flutter packages: `image_picker: ^1.1.2`, `device_info_plus: ^11.5.0`
 
@@ -524,7 +538,7 @@ if (records.length > 0) {
 
 ### Modify settings screen
 - UI and layout: `frontend/lib/screens/settings_screen.dart`
-- Dialogs: `frontend/lib/widgets/dialogs/` (reset_password_dialog, delete_account_dialog, profile_picture_dialog)
+- Dialogs: `frontend/lib/widgets/dialogs/` (reset_password_dialog, delete_account_dialog)
 - Avatar with profile picture: `frontend/lib/widgets/avatar_circle.dart` — handles absolute URLs (Cloudinary) and relative paths via `_buildImageUrl()`
 
 ### Modify avatar storage (Cloudinary)
@@ -641,6 +655,18 @@ multer                              # File upload middleware (memoryStorage)
 ---
 
 ## 📋 BUG FIX HISTORY
+
+### 2026-02-01 - Avatar Update Not Reflecting (Cloudinary Overwrite + Delete)
+
+**Problem:** After selecting a new photo in Settings, avatar did not change — page refreshed but image stayed the same.
+
+**Root cause:** `UsersService.updateProfilePicture` deleted the old avatar via `deleteAvatar(user.profilePicturePublicId)`. Cloudinary uses the same `public_id` (avatars/user-X) when overwriting, so we were deleting the image we had just uploaded.
+
+**Fix:** Only call `deleteAvatar` when `oldPublicId !== newPublicId`. For overwrite (same public_id), skip delete — the upload already replaced the file.
+
+**Files:** `backend/src/users/users.service.ts`
+
+**UI change:** Camera icon opens gallery directly; ProfilePictureDialog removed.
 
 ### 2026-01-31 (Round 10) - Socket Cache Causing Session Data Leakage (FINAL FIX)
 

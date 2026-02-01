@@ -9,7 +9,6 @@ import '../providers/settings_provider.dart';
 import '../widgets/avatar_circle.dart';
 import '../widgets/dialogs/reset_password_dialog.dart';
 import '../widgets/dialogs/delete_account_dialog.dart';
-import '../widgets/dialogs/profile_picture_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -47,15 +46,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showProfilePictureDialog() async {
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (context) => const ProfilePictureDialog(),
-    );
-
-    if (source == null || !mounted) return;
-
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: source);
+    final image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null || !mounted) return;
 
     try {

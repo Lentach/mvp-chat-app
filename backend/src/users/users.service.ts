@@ -75,8 +75,8 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Delete old Cloudinary avatar if exists (has publicId = stored in Cloudinary)
-    if (user.profilePicturePublicId) {
+    // Delete old Cloudinary avatar only if different publicId (overwrite uses same id)
+    if (user.profilePicturePublicId && user.profilePicturePublicId !== publicId) {
       await this.cloudinaryService.deleteAvatar(user.profilePicturePublicId);
     }
 
