@@ -101,6 +101,8 @@ class ChatProvider extends ChangeNotifier {
       _socketService.disconnect();
     }
 
+    debugPrint('[ChatProvider] Connecting WebSocket for userId=$userId');
+
     _currentUserId = userId;
     _socketService.connect(
       baseUrl: AppConfig.baseUrl,
@@ -333,6 +335,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void disconnect() {
+    debugPrint('[ChatProvider] Disconnecting WebSocket');
     _socketService.disconnect();
     _conversations = [];
     _messages = [];
