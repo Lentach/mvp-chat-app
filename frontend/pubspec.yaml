@@ -40,6 +40,7 @@ dependencies:
   shared_preferences: ^2.3.4
   image_picker: ^1.1.2
   device_info_plus: ^11.2.0
+  emoji_picker_flutter: ^2.0.0
 
 dev_dependencies:
   flutter_test:

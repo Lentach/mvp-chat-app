@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
 
@@ -12,7 +14,9 @@ class ChatInputBar extends StatefulWidget {
 
 class _ChatInputBarState extends State<ChatInputBar> {
   final _controller = TextEditingController();
+  final _imagePicker = ImagePicker();
   bool _hasText = false;
+  bool _showEmojiPicker = false;
 
   @override
   void initState() {
@@ -36,6 +40,31 @@ class _ChatInputBarState extends State<ChatInputBar> {
     if (text.isEmpty) return;
     context.read<ChatProvider>().sendMessage(text);
     _controller.clear();
+
+    if (_showEmojiPicker) {
+      setState(() => _showEmojiPicker = false);
+    }
+  }
+
+  void _toggleEmojiPicker() {
+    setState(() => _showEmojiPicker = !_showEmojiPicker);
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
+    if (image != null && mounted) {
+      // TODO: Upload image and send as message (Phase 5)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image upload coming soon')),
+      );
+    }
+  }
+
+  void _recordVoice() {
+    // TODO: Voice recording (future feature)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Voice messages coming soon')),
+    );
   }
 
   @override
@@ -47,71 +76,116 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final inputBg = isDark ? RpgTheme.inputBg : RpgTheme.inputBgLight;
     final tabBorderColor =
         isDark ? RpgTheme.tabBorderDark : RpgTheme.tabBorderLight;
-    final sendIconColor = _hasText
-        ? (isDark ? RpgTheme.accentDark : Colors.white)
-        : (isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight);
 
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(top: BorderSide(color: borderColor)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                style: RpgTheme.bodyFont(
-                  fontSize: 14,
-                  color: colorScheme.onSurface,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Input row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              border: Border(top: BorderSide(color: borderColor)),
+            ),
+            child: Row(
+              children: [
+                // Attachment button (gallery)
+                IconButton(
+                  icon: const Icon(Icons.attach_file),
+                  iconSize: 24,
+                  color: isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight,
+                  onPressed: _pickImageFromGallery,
                 ),
-                decoration: InputDecoration(
-                  hintText: 'Type a message...',
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: tabBorderColor),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: tabBorderColor),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(
-                      color: RpgTheme.primaryColor(context),
-                      width: 1.5,
+
+                // Text field
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    style: RpgTheme.bodyFont(
+                      fontSize: 14,
+                      color: colorScheme.onSurface,
                     ),
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: tabBorderColor),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: tabBorderColor),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(
+                          color: RpgTheme.primaryColor(context),
+                          width: 1.5,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: inputBg,
+                    ),
+                    maxLines: null,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
                   ),
-                  filled: true,
-                  fillColor: inputBg,
                 ),
-                maxLines: null,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
+
+                const SizedBox(width: 4),
+
+                // Emoji button
+                IconButton(
+                  icon: Icon(
+                    _showEmojiPicker ? Icons.keyboard : Icons.emoji_emotions_outlined,
+                  ),
+                  iconSize: 24,
+                  color: isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight,
+                  onPressed: _toggleEmojiPicker,
+                ),
+
+                const SizedBox(width: 4),
+
+                // Mic / Send toggle
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _hasText
+                        ? RpgTheme.primaryColor(context)
+                        : Colors.transparent,
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      _hasText ? Icons.send_rounded : Icons.mic,
+                      size: 22,
+                    ),
+                    color: _hasText
+                        ? (isDark ? RpgTheme.accentDark : Colors.white)
+                        : (isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight),
+                    onPressed: _hasText ? _send : _recordVoice,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Emoji picker
+          if (_showEmojiPicker)
+            SizedBox(
+              height: 250,
+              child: EmojiPicker(
+                onEmojiSelected: (category, emoji) {
+                  _controller.text += emoji.emoji;
+                },
+                config: const Config(),
               ),
             ),
-            const SizedBox(width: 8),
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: RpgTheme.primaryColor(context),
-              ),
-              child: IconButton(
-                icon: Icon(
-                  Icons.send_rounded,
-                  color: sendIconColor,
-                  size: 22,
-                ),
-                onPressed: _hasText ? _send : null,
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
