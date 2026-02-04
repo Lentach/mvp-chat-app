@@ -48,11 +48,27 @@ class ChatProvider extends ChangeNotifier {
 
   void _handleIncomingMessage(dynamic data) {
     final msg = MessageModel.fromJson(data as Map<String, dynamic>);
-    _lastMessages[msg.conversationId] = msg;
+
+    // If this is our own message (messageSent), replace temp optimistic message
+    if (msg.senderId == _currentUserId) {
+      final tempIndex = _messages.indexWhere((m) => m.id < 0 && m.content == msg.content);
+      if (tempIndex != -1) {
+        _messages.removeAt(tempIndex);
+      }
+    }
+
+    // Add confirmed message
     if (msg.conversationId == _activeConversationId) {
       _messages.add(msg);
     }
+
+    _lastMessages[msg.conversationId] = msg;
     notifyListeners();
+
+    // Emit messageDelivered if this is incoming from other user
+    if (msg.senderId != _currentUserId) {
+      _socketService.emitMessageDelivered(msg.id);
+    }
   }
 
   int? consumePendingOpen() {
@@ -225,6 +241,8 @@ class ChatProvider extends ChangeNotifier {
         }
         notifyListeners();
       },
+      onMessageDelivered: _handleMessageDelivered,
+      onPingReceived: _handlePingReceived,
       onDisconnect: (_) => _onDisconnect(),
     );
   }
@@ -250,7 +268,7 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void sendMessage(String content) {
+  void sendMessage(String content, {int? expiresIn}) {
     if (_activeConversationId == null || _currentUserId == null) return;
 
     final conv = _conversations.firstWhere(
@@ -261,7 +279,56 @@ class ChatProvider extends ChangeNotifier {
         ? conv.userTwo.id
         : conv.userOne.id;
 
-    _socketService.sendMessage(recipientId, content);
+    // Create optimistic message with SENDING status
+    final tempMessage = MessageModel(
+      id: -DateTime.now().millisecondsSinceEpoch, // Temporary negative ID
+      content: content,
+      senderId: _currentUserId!,
+      senderEmail: '', // Will be replaced when server confirms
+      conversationId: _activeConversationId!,
+      createdAt: DateTime.now(),
+      deliveryStatus: MessageDeliveryStatus.sending,
+      expiresAt: expiresIn != null
+          ? DateTime.now().add(Duration(seconds: expiresIn))
+          : null,
+    );
+
+    _messages.add(tempMessage);
+    notifyListeners();
+
+    _socketService.sendMessage(recipientId, content, expiresIn: expiresIn);
+  }
+
+  void sendPing(int recipientId) {
+    _socketService.sendPing(recipientId);
+  }
+
+  void _handleMessageDelivered(dynamic data) {
+    final messageId = (data as Map<String, dynamic>)['messageId'] as int;
+    final status = data['deliveryStatus'] as String;
+
+    // Update message in _messages list
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index != -1) {
+      _messages[index] = _messages[index].copyWith(
+        deliveryStatus: MessageModel.parseDeliveryStatus(status),
+      );
+      notifyListeners();
+    }
+  }
+
+  void _handlePingReceived(dynamic data) {
+    final message = MessageModel.fromJson(data as Map<String, dynamic>);
+
+    // Add to messages if active conversation matches
+    if (_activeConversationId == message.conversationId) {
+      _messages.add(message);
+    }
+
+    // Update last message
+    _lastMessages[message.conversationId] = message;
+
+    notifyListeners();
   }
 
   void startConversation(String recipientEmail) {

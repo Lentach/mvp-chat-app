@@ -24,6 +24,8 @@ class SocketService {
     required void Function(dynamic) onPendingRequestsCount,
     required void Function(dynamic) onFriendsList,
     required void Function(dynamic) onUnfriended,
+    required void Function(dynamic) onMessageDelivered,
+    required void Function(dynamic) onPingReceived,
   }) {
     // Defensive cleanup: ensure any previous socket is fully disposed
     // before creating a new one (prevents cache reuse)
@@ -59,6 +61,8 @@ class SocketService {
     _socket!.on('pendingRequestsCount', onPendingRequestsCount);
     _socket!.on('friendsList', onFriendsList);
     _socket!.on('unfriended', onUnfriended);
+    _socket!.on('messageDelivered', onMessageDelivered);
+    _socket!.on('newPing', onPingReceived);
     _socket!.onDisconnect(onDisconnect);
 
     _socket!.connect();
@@ -68,10 +72,26 @@ class SocketService {
     _socket?.emit('getConversations');
   }
 
-  void sendMessage(int recipientId, String content) {
-    _socket?.emit('sendMessage', {
+  void sendMessage(int recipientId, String content, {int? expiresIn}) {
+    final payload = {
       'recipientId': recipientId,
       'content': content,
+    };
+    if (expiresIn != null) {
+      payload['expiresIn'] = expiresIn;
+    }
+    _socket?.emit('sendMessage', payload);
+  }
+
+  void sendPing(int recipientId) {
+    _socket?.emit('sendPing', {
+      'recipientId': recipientId,
+    });
+  }
+
+  void emitMessageDelivered(int messageId) {
+    _socket?.emit('messageDelivered', {
+      'messageId': messageId,
     });
   }
 
