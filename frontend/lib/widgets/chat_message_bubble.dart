@@ -16,6 +16,47 @@ class ChatMessageBubble extends StatelessWidget {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildDeliveryIcon() {
+    if (!isMine) return const SizedBox.shrink();
+
+    IconData icon;
+    Color color;
+
+    switch (message.deliveryStatus) {
+      case MessageDeliveryStatus.sending:
+        icon = Icons.access_time;
+        color = Colors.grey;
+        break;
+      case MessageDeliveryStatus.sent:
+        icon = Icons.check;
+        color = Colors.grey;
+        break;
+      case MessageDeliveryStatus.delivered:
+        icon = Icons.done_all;
+        color = Colors.blue;
+        break;
+    }
+
+    return Icon(icon, size: 12, color: color);
+  }
+
+  String? _getTimerText() {
+    if (message.expiresAt == null) return null;
+
+    final now = DateTime.now();
+    final remaining = message.expiresAt!.difference(now);
+
+    if (remaining.isNegative) return 'Expired';
+
+    if (remaining.inHours > 0) {
+      return '${remaining.inHours}h';
+    } else if (remaining.inMinutes > 0) {
+      return '${remaining.inMinutes}m';
+    } else {
+      return '${remaining.inSeconds}s';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = RpgTheme.isDark(context);
@@ -61,16 +102,57 @@ class ChatMessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              message.content,
-              style: RpgTheme.bodyFont(fontSize: 14, color: textColor),
-            ),
+            // Message content based on type
+            if (message.messageType == MessageType.text)
+              Text(
+                message.content,
+                style: RpgTheme.bodyFont(fontSize: 14, color: textColor),
+              )
+            else if (message.messageType == MessageType.ping)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.campaign, size: 18, color: textColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'PING!',
+                    style: RpgTheme.bodyFont(
+                      fontSize: 14,
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              )
+            else if (message.messageType == MessageType.image ||
+                     message.messageType == MessageType.drawing)
+              Text(
+                message.content.isNotEmpty ? message.content : '[Image]',
+                style: RpgTheme.bodyFont(fontSize: 14, color: textColor),
+              ),
             const SizedBox(height: 4),
+            // Bottom row: time + delivery + timer
             Align(
               alignment: Alignment.bottomRight,
-              child: Text(
-                _formatTime(message.createdAt),
-                style: RpgTheme.bodyFont(fontSize: 10, color: timeColor),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatTime(message.createdAt),
+                    style: RpgTheme.bodyFont(fontSize: 10, color: timeColor),
+                  ),
+                  const SizedBox(width: 4),
+                  _buildDeliveryIcon(),
+                  if (_getTimerText() != null) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.timer_outlined, size: 10, color: timeColor),
+                    const SizedBox(width: 2),
+                    Text(
+                      _getTimerText()!,
+                      style: RpgTheme.bodyFont(fontSize: 10, color: timeColor),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
