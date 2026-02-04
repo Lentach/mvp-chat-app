@@ -222,28 +222,26 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             Navigator.of(context).pop();
           },
         ),
-        title: Row(
-          children: [
-            AvatarCircle(
-              email: contactName,
-              radius: 16,
-              profilePictureUrl: otherUser?.profilePictureUrl,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                contactName,
-                style: RpgTheme.bodyFont(
-                  fontSize: 16,
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+        title: Text(
+          contactName,
+          style: RpgTheme.bodyFont(
+            fontSize: 16,
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          // Avatar on the right
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: AvatarCircle(
+              email: contactName,
+              radius: 18,
+              profilePictureUrl: otherUser?.profilePictureUrl,
+            ),
+          ),
+          // Menu (three dots)
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'unfriend') {
