@@ -9,11 +9,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MessagesService } from './messages.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { ConversationsService } from '../conversations/conversations.service';
 import { UsersService } from '../users/users.service';
+import { FriendsService } from '../friends/friends.service';
 import { MessageType } from './message.entity';
 
 @Controller('messages')
@@ -23,10 +25,12 @@ export class MessagesController {
     private cloudinaryService: CloudinaryService,
     private conversationsService: ConversationsService,
     private usersService: UsersService,
+    private friendsService: FriendsService,
   ) {}
 
   @Post('image')
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 uploads per minute
   @UseInterceptors(FileInterceptor('file'))
   async uploadImageMessage(
     @UploadedFile() file: Express.Multer.File,
@@ -52,6 +56,15 @@ export class MessagesController {
     const recipient = await this.usersService.findById(parseInt(recipientId));
     if (!recipient) {
       throw new BadRequestException('Recipient not found');
+    }
+
+    // Verify friend relationship
+    const areFriends = await this.friendsService.areFriends(
+      sender.id,
+      recipient.id,
+    );
+    if (!areFriends) {
+      throw new BadRequestException('You can only send images to friends');
     }
 
     // Upload to Cloudinary

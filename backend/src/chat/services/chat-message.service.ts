@@ -7,7 +7,7 @@ import { UsersService } from '../../users/users.service';
 import { validateDto } from '../utils/dto.validator';
 import { SendMessageDto, GetMessagesDto } from '../dto/chat.dto';
 import { SendPingDto } from '../dto/send-ping.dto';
-import { MessageType } from '../../messages/message.entity';
+import { MessageType, MessageDeliveryStatus } from '../../messages/message.entity';
 
 @Injectable()
 export class ChatMessageService {
@@ -202,6 +202,41 @@ export class ChatMessageService {
     const recipientSocketId = onlineUsers.get(recipientId);
     if (recipientSocketId) {
       server.to(recipientSocketId).emit('newPing', payload);
+    }
+  }
+
+  async handleMessageDelivered(
+    client: Socket,
+    data: any,
+    server: Server,
+    onlineUsers: Map<number, string>,
+  ) {
+    const user = client.data.user;
+    if (!user) return;
+
+    const { messageId } = data;
+    if (!messageId) {
+      client.emit('error', { message: 'messageId is required' });
+      return;
+    }
+
+    // Update message delivery status
+    const updated = await this.messagesService.updateDeliveryStatus(
+      messageId,
+      MessageDeliveryStatus.DELIVERED,
+    );
+
+    if (!updated) {
+      return; // Message not found or already updated
+    }
+
+    // Notify the sender that their message was delivered
+    const senderSocketId = onlineUsers.get(updated.sender.id);
+    if (senderSocketId) {
+      server.to(senderSocketId).emit('messageDelivered', {
+        messageId: updated.id,
+        deliveryStatus: MessageDeliveryStatus.DELIVERED,
+      });
     }
   }
 }

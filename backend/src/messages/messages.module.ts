@@ -9,6 +9,7 @@ import { MessagesController } from './messages.controller';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { UsersModule } from '../users/users.module';
+import { FriendsModule } from '../friends/friends.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { UsersModule } from '../users/users.module';
     CloudinaryModule,
     ConversationsModule,
     UsersModule,
+    FriendsModule,
   ],
   controllers: [MessagesController],
   providers: [MessagesService, MessageCleanupService],

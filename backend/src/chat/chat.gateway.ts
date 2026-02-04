@@ -118,6 +118,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  @SubscribeMessage('messageDelivered')
+  async handleMessageDelivered(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    return this.chatMessageService.handleMessageDelivered(
+      client,
+      data,
+      this.server,
+      this.onlineUsers,
+    );
+  }
+
   // ========== CONVERSATION HANDLERS ==========
 
   @SubscribeMessage('startConversation')

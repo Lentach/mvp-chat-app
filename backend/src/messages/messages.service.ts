@@ -49,4 +49,21 @@ export class MessagesService {
       skip: offset,
     });
   }
+
+  async updateDeliveryStatus(
+    messageId: number,
+    status: MessageDeliveryStatus,
+  ): Promise<Message | null> {
+    const message = await this.msgRepo.findOne({
+      where: { id: messageId },
+      relations: ['sender'],
+    });
+
+    if (!message) {
+      return null;
+    }
+
+    message.deliveryStatus = status;
+    return this.msgRepo.save(message);
+  }
 }
