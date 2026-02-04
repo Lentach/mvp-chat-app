@@ -372,7 +372,55 @@ erDiagram
 
 ---
 
-## 12. Recent Changes (2026-02-01)
+## 12. Chat Screen Redesign (2026-02-04)
+
+Telegram/Wire-inspired UI with delivery indicators, disappearing messages, ping notifications, and action tiles.
+
+### New Message Features
+
+- **Delivery Status Tracking:** SENDING (clock), SENT (✓), DELIVERED (✓✓) indicators on own messages only. Backend: `MessageDeliveryStatus` enum. Frontend: optimistic UI updates.
+- **Disappearing Messages:** Global timer per conversation (30s, 1m, 5m, 1h, 1d, Off). Set via Timer action tile. Messages include `expiresAt` field. Cron job cleanup (every minute) not yet implemented.
+- **Ping Messages:** One-shot notification with empty content and `messageType=PING`. Backend emits `pingSent` to sender, `newPing` to recipient. UI shows campaign icon + "PING!" text.
+- **Message Types:** TEXT, PING, IMAGE, DRAWING (last two not fully implemented).
+
+### UI Components
+
+- **ChatMessageBubble:** Shows delivery icon (clock/✓/✓✓) + timer countdown if `expiresAt` set. Ping messages display with campaign icon.
+- **ChatInputBar:** Attachment button (gallery), emoji picker toggle, mic/send toggle. Emoji picker (emoji_picker_flutter) appears below input when toggled.
+- **ChatActionTiles:** Horizontal scroll row with 6 tiles: Timer (dialog with duration options), Ping (sends ping), Camera, Draw, GIF, More (placeholders).
+- **AppBar:** Username centered (title), avatar on right (actions), back button (left), three-dot menu (unfriend option).
+
+### Backend Changes
+
+- **Message Entity:** Added `deliveryStatus` (enum), `expiresAt` (timestamp), `messageType` (enum), `mediaUrl` (text nullable).
+- **SendMessageDto:** Added `expiresIn` (optional seconds).
+- **SendPingDto:** New DTO with `recipientId`.
+- **WebSocket Events:** `messageDelivered` (update delivery status), `newPing` (receive ping), `pingSent` (confirm ping sent).
+- **ChatMessageService:** `handleSendPing` method creates ping messages with `messageType=PING`.
+
+### Frontend Changes
+
+- **MessageModel:** Added `deliveryStatus`, `expiresAt`, `messageType`, `mediaUrl` fields. Public `parseDeliveryStatus()` method.
+- **ChatProvider:** `sendPing()`, `_handleMessageDelivered()`, `_handlePingReceived()`, `conversationDisappearingTimer`, `setConversationDisappearingTimer()`. Optimistic message updates with SENDING status. Emits `messageDelivered` when receiving messages.
+- **SocketService:** `sendPing()`, `emitMessageDelivered()`, updated `sendMessage()` signature with `expiresIn`.
+- **Dependencies:** `emoji_picker_flutter ^2.0.0`.
+
+### Files Modified
+
+- Backend: `message.entity.ts`, `messages.service.ts`, `chat-message.service.ts`, `chat.dto.ts`, `send-ping.dto.ts` (new), `chat.gateway.ts`
+- Frontend: `message_model.dart`, `chat_provider.dart`, `socket_service.dart`, `chat_input_bar.dart`, `chat_message_bubble.dart`, `chat_detail_screen.dart`, `chat_action_tiles.dart` (new), `pubspec.yaml`
+
+### Not Yet Implemented
+
+- Ping visual effect + sound (Task 3.5)
+- Drawing canvas screen (Task 3.6)
+- Message expiration cron job (Task 4.1)
+- Live timer countdown refresh (Task 4.2)
+- Image upload endpoint + camera/drawing upload (Tasks 5.1, 5.2)
+
+---
+
+## 13. Recent Changes (2026-02-01)
 
 - **Conversations UI redesign:** MainShell + BottomNav (Conversations, Archive, Settings). ConversationsScreen: custom header (avatar+shield, "Conversations", plus with badge); plus → AddOrInvitationsScreen; list separator = Divider. ArchivePlaceholderScreen "Coming soon". Logout only from Settings; SettingsScreen pops only when canPop().
 - **Code review / shipping:** Removed dead RpgTheme colors; ChatProvider single _handleIncomingMessage; E2E scripts moved to scripts/.
@@ -382,7 +430,7 @@ erDiagram
 
 ---
 
-## 13. Environment
+## 14. Environment
 
 | Var | Required | Purpose |
 |-----|----------|---------|
