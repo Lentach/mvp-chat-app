@@ -6,7 +6,7 @@
 
 **Session rule:** Read `.cursor/session-summaries/LATEST.md` at start; write `YYYY-MM-DD-session.md` and update `LATEST.md` at end. `.cursor/rules/session-summaries.mdc`
 
-**Code rule:** All code in English (vars, functions, comments, commits). `.cursor/rules/code-in-english.mdc`
+**Code rule:** All code in English (vars, functions, comments, commits). If you find Polish in code files (.dart, .ts, .js, etc.), refactor to English. Documentation (.md) can be in Polish. `.cursor/rules/code-in-english.mdc`
 
 ---
 
