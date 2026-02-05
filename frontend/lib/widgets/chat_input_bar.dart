@@ -87,9 +87,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Action tiles row
-          const ChatActionTiles(),
-
           // Input row
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -181,6 +178,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
               ],
             ),
           ),
+
+          // Action tiles row (POD tekstem)
+          const ChatActionTiles(),
 
           // Emoji picker
           if (_showEmojiPicker)

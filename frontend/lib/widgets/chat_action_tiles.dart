@@ -14,64 +14,49 @@ class ChatActionTiles extends StatelessWidget {
     final isDark = RpgTheme.isDark(context);
     final borderColor =
         isDark ? RpgTheme.convItemBorderDark : RpgTheme.convItemBorderLight;
-    final tileColor = isDark ? RpgTheme.inputBg : RpgTheme.inputBgLight;
     final iconColor = isDark ? RpgTheme.accentDark : RpgTheme.primaryLight;
 
     return Container(
-      height: 60,
+      height: 48,
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: borderColor)),
       ),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _ActionTile(
             icon: Icons.timer_outlined,
-            label: 'Timer',
+            tooltip: 'Timer',
             color: iconColor,
-            backgroundColor: tileColor,
             onTap: () => _showTimerDialog(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           _ActionTile(
-            icon: Icons.campaign,
-            label: 'Ping',
+            icon: Icons.auto_awesome,
+            tooltip: 'Ping',
             color: iconColor,
-            backgroundColor: tileColor,
             onTap: () => _sendPing(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           _ActionTile(
             icon: Icons.camera_alt,
-            label: 'Camera',
+            tooltip: 'Camera',
             color: iconColor,
-            backgroundColor: tileColor,
             onTap: () => _openCamera(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           _ActionTile(
             icon: Icons.brush,
-            label: 'Draw',
+            tooltip: 'Draw',
             color: iconColor,
-            backgroundColor: tileColor,
             onTap: () => _openDrawing(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           _ActionTile(
             icon: Icons.gif_box,
-            label: 'GIF',
+            tooltip: 'GIF',
             color: iconColor,
-            backgroundColor: tileColor,
             onTap: () => _showComingSoon(context, 'GIF picker'),
-          ),
-          const SizedBox(width: 8),
-          _ActionTile(
-            icon: Icons.more_horiz,
-            label: 'More',
-            color: iconColor,
-            backgroundColor: tileColor,
-            onTap: () => _showComingSoon(context, 'More options'),
           ),
         ],
       ),
@@ -179,46 +164,33 @@ class ChatActionTiles extends StatelessWidget {
 
 class _ActionTile extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String tooltip;
   final Color color;
-  final Color backgroundColor;
   final VoidCallback onTap;
 
   const _ActionTile({
     required this.icon,
-    required this.label,
+    required this.tooltip,
     required this.color,
-    required this.backgroundColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 70,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24, color: color),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: RpgTheme.bodyFont(
-                fontSize: 10,
-                color: color,
-              ),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 40,
+          height: 40,
+          padding: const EdgeInsets.all(8),
+          decoration: const BoxDecoration(
+            color: Colors.transparent,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 24, color: color),
         ),
       ),
     );
