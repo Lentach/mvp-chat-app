@@ -19,6 +19,7 @@
 | **Socket.IO (Dart)** | Use `enableForceNew()` when reconnecting with new JWT (logout→login). Caches by URL otherwise. |
 | **Provider→Navigator** | `ChatProvider` can't call `Navigator.push`. Use `consumePendingOpen()`: set ID, notifyListeners, screen pops in build. |
 | **Multiple backends** | If frontend shows weird data vs backend logs: kill local `node.exe`, use Docker only. |
+| **TypeORM timestamp comparison** | `expiresAt` may be string or Date from pg driver. Always use `new Date(val).getTime()` for comparisons, never `val > new Date()`. |
 
 ---
 
@@ -388,7 +389,7 @@ Telegram/Wire-inspired UI with delivery indicators, disappearing messages, ping 
 ### UI Components
 
 - **ChatMessageBubble:** Shows delivery icon (clock/✓/✓✓) + timer countdown if `expiresAt` set. Ping messages display with campaign icon.
-- **ChatInputBar:** Attachment button (gallery), emoji picker toggle, mic/send toggle. Emoji picker (emoji_picker_flutter) appears below input when toggled.
+- **ChatInputBar:** Arrow toggle for action panel, text field, mic/send toggle. Orange timer indicator bar above input when disappearing timer is active (shows "Disappearing messages: Xm"). Action panel slides open with ChatActionTiles.
 - **ChatActionTiles:** Horizontal scroll row with 6 tiles: Timer (dialog with duration options), Ping (sends ping), Camera, Draw, GIF, More (placeholders).
 - **AppBar:** Username centered (title), avatar on right (actions), back button (left), three-dot menu (unfriend option).
 
@@ -421,7 +422,7 @@ Telegram/Wire-inspired UI with delivery indicators, disappearing messages, ping 
 
 ## 13. Recent Changes (2026-02-06)
 
-- **Disappearing messages fix (2026-02-06):** Two bugs fixed: (1) Timer reaching zero showed "Expired" text instead of removing the message — added `ChatProvider.removeExpiredMessages()` called every 1s by ChatDetailScreen timer; `ChatMessageBubble._getTimerText()` returns null for expired messages. (2) Messages disappeared when leaving/re-entering chat before timer expired — added `relations: ['sender']` to `findByConversation`, error handling in `handleGetMessages`, and three-layer expiration filtering (backend response + frontend receive + frontend timer). Files: chat_provider.dart, chat_detail_screen.dart, chat_message_bubble.dart, messages.service.ts, chat-message.service.ts.
+- **Disappearing messages fix (2026-02-06):** Three bugs fixed: (1) Timer reaching zero showed "Expired" text — added `ChatProvider.removeExpiredMessages()` called every 1s. (2) Messages disappeared on chat re-entry — root cause: TypeORM returns `expiresAt` as string; `string > Date` yields NaN in JS, filtering out all timed messages. Fix: `new Date(m.expiresAt).getTime() > nowMs`. (3) Added visual orange timer indicator bar in ChatInputBar showing active disappearing timer duration (e.g. "Disappearing messages: 1m"). Timer is sticky per conversation — set once, applies to all future messages. Files: chat_provider.dart, chat_detail_screen.dart, chat_message_bubble.dart, chat_input_bar.dart, messages.service.ts, chat-message.service.ts.
 
 - **Docker hot-reload fix (2026-02-06):** Windows Docker volumes don't propagate inotify events. Backend: added `watchOptions` with polling to tsconfig.json. Frontend: polling watcher script (dev-entrypoint.sh) that detects file content changes and touches files to trigger inotify. Files: tsconfig.json, Dockerfile.dev, dev-entrypoint.sh.
 
@@ -455,7 +456,7 @@ Frontend: BASE_URL dart define (default localhost:3000).
 - **deleteConversation:** Call unfriend() first. chat-conversation.service.ts.
 - **Avatar blink in chat screen:** Use stable cache-bust per profilePictureUrl in AvatarCircle so parent rebuilds (e.g. Timer.periodic in ChatDetailScreen) don't change image URL and reload. avatar_circle.dart.
 - **Disappearing messages — "Expired" not vanishing:** Frontend never removed expired messages from `_messages`. Fix: `ChatProvider.removeExpiredMessages()` called every 1s removes messages where `expiresAt < now`. `_getTimerText()` returns null (not "Expired"). chat_provider.dart, chat_message_bubble.dart, chat_detail_screen.dart.
-- **Disappearing messages — vanish on chat re-entry:** Backend `findByConversation` relied on eager loading for sender (fragile). Fix: explicit `relations: ['sender']`, error handling in `handleGetMessages`, expired message filtering in backend response and frontend receive. messages.service.ts, chat-message.service.ts, chat_provider.dart.
+- **Disappearing messages — vanish on chat re-entry:** Two-stage fix. (1) Added explicit `relations: ['sender']` and error handling. (2) **Root cause:** TypeORM returns `expiresAt` as string from pg driver; `string > Date` yields NaN in JavaScript, filtering out ALL timed messages. Fix: `new Date(m.expiresAt).getTime() > nowMs`. Also fixed frontend `onMessageHistory` to use `.removeWhere()` instead of `.where()` filter. messages.service.ts, chat-message.service.ts, chat_provider.dart.
 
 ---
 
