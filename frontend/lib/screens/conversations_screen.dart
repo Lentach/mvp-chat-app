@@ -335,6 +335,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           displayName: displayName,
           lastMessage: lastMsg,
           isActive: conv.id == chat.activeConversationId,
+          unreadCount: chat.getUnreadCount(conv.id),
           onTap: () => _openChat(conv.id),
           onDelete: () => _deleteConversation(conv.id),
           otherUser: otherUser,

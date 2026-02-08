@@ -84,6 +84,29 @@ export class MessagesService {
     return this.msgRepo.save(message);
   }
 
+  /**
+   * Count unread messages for a recipient in a conversation.
+   * Unread = messages sent by the other participant, not yet READ, not expired.
+   */
+  async countUnreadForRecipient(
+    conversationId: number,
+    recipientUserId: number,
+  ): Promise<number> {
+    const qb = this.msgRepo
+      .createQueryBuilder('m')
+      .innerJoin('m.sender', 's')
+      .where('m.conversation_id = :convId', { convId: conversationId })
+      .andWhere('s.id != :userId', { userId: recipientUserId })
+      .andWhere('m."deliveryStatus" != :status', {
+        status: MessageDeliveryStatus.READ,
+      });
+    // Exclude expired messages (column is deliveryStatus/expiresAt camelCase)
+    qb.andWhere(
+      '(m."expiresAt" IS NULL OR m."expiresAt" > CURRENT_TIMESTAMP)',
+    );
+    return qb.getCount();
+  }
+
   /** Mark all messages in the conversation that were sent BY senderId (to the other participant) as READ. Returns updated messages with sender. */
   async markConversationAsReadFromSender(
     conversationId: number,

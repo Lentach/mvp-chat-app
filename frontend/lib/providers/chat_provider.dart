@@ -31,6 +31,7 @@ class ChatProvider extends ChangeNotifier {
   Timer? _reconnectTimer;
   final Map<int, int?> _conversationTimers = {}; // conversationId -> seconds
   bool _showPingEffect = false;
+  final Map<int, int> _unreadCounts = {}; // conversationId -> count
 
   List<ConversationModel> get conversations => _conversations;
   List<MessageModel> get messages => _messages;
@@ -51,6 +52,8 @@ class ChatProvider extends ChangeNotifier {
   }
 
   bool get showPingEffect => _showPingEffect;
+
+  int getUnreadCount(int conversationId) => _unreadCounts[conversationId] ?? 0;
 
   void setConversationDisappearingTimer(int? seconds) {
     if (_activeConversationId == null) return;
@@ -85,14 +88,17 @@ class ChatProvider extends ChangeNotifier {
     }
 
     _lastMessages[msg.conversationId] = msg;
-    notifyListeners();
-
     if (msg.senderId != _currentUserId) {
+      if (msg.conversationId != _activeConversationId) {
+        _unreadCounts[msg.conversationId] =
+            (_unreadCounts[msg.conversationId] ?? 0) + 1;
+      }
       _socketService.emitMessageDelivered(msg.id);
       if (msg.conversationId == _activeConversationId) {
         markConversationRead(msg.conversationId);
       }
     }
+    notifyListeners();
   }
 
   void markConversationRead(int conversationId) {
@@ -151,6 +157,7 @@ class ChatProvider extends ChangeNotifier {
     _messages = [];
     _activeConversationId = null;
     _lastMessages.clear();
+    _unreadCounts.clear();
     _pendingOpenConversationId = null;
     _friendRequests = [];
     _pendingRequestsCount = 0;
@@ -189,6 +196,13 @@ class ChatProvider extends ChangeNotifier {
             .map((c) =>
                 ConversationModel.fromJson(c as Map<String, dynamic>))
             .toList();
+        _unreadCounts.clear();
+        for (final c in list) {
+          final m = c as Map<String, dynamic>;
+          final convId = m['id'] as int;
+          final unread = (m['unreadCount'] as num?)?.toInt() ?? 0;
+          _unreadCounts[convId] = unread;
+        }
         notifyListeners();
       },
       onMessageHistory: (data) {
@@ -300,6 +314,7 @@ class ChatProvider extends ChangeNotifier {
   void openConversation(int conversationId, {int limit = AppConstants.messagePageSize}) {
     debugPrint('[ChatProvider] openConversation($conversationId) — requesting messages');
     _activeConversationId = conversationId;
+    _unreadCounts[conversationId] = 0;
     _messages = [];
     _socketService.getMessages(conversationId, limit: limit);
     notifyListeners();
@@ -471,6 +486,7 @@ class ChatProvider extends ChangeNotifier {
     // Optimistic UI update
     _conversations.removeWhere((c) => c.id == conversationId);
     _lastMessages.remove(conversationId);
+    _unreadCounts.remove(conversationId);
 
     if (_activeConversationId == conversationId) {
       _activeConversationId = null;
@@ -522,6 +538,7 @@ class ChatProvider extends ChangeNotifier {
     _activeConversationId = null;
     _currentUserId = null;
     _lastMessages.clear();
+    _unreadCounts.clear();
     _pendingOpenConversationId = null;
     _friendRequests = [];
     _pendingRequestsCount = 0;

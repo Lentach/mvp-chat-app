@@ -8,6 +8,7 @@ class ConversationTile extends StatelessWidget {
   final String displayName;
   final MessageModel? lastMessage;
   final bool isActive;
+  final int unreadCount;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final UserModel? otherUser;
@@ -17,6 +18,7 @@ class ConversationTile extends StatelessWidget {
     required this.displayName,
     this.lastMessage,
     this.isActive = false,
+    this.unreadCount = 0,
     required this.onTap,
     required this.onDelete,
     this.otherUser,
@@ -87,14 +89,41 @@ class ConversationTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (lastMessage != null)
-                    Text(
-                      _formatTime(lastMessage!.createdAt),
-                      style: RpgTheme.bodyFont(
-                        fontSize: 11,
-                        color: secondaryColor,
-                      ),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (unreadCount > 0)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: RpgTheme.accentDark,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 18),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : '$unreadCount',
+                            style: RpgTheme.bodyFont(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      if (lastMessage != null)
+                        Text(
+                          _formatTime(lastMessage!.createdAt),
+                          style: RpgTheme.bodyFont(
+                            fontSize: 11,
+                            color: secondaryColor,
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   IconButton(
                     icon: const Icon(Icons.delete_outline, size: 18),

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { ConversationsService } from '../../conversations/conversations.service';
+import { MessagesService } from '../../messages/messages.service';
 import { UsersService } from '../../users/users.service';
 import { FriendsService } from '../../friends/friends.service';
 import { validateDto } from '../utils/dto.validator';
@@ -14,6 +15,7 @@ export class ChatConversationService {
 
   constructor(
     private readonly conversationsService: ConversationsService,
+    private readonly messagesService: MessagesService,
     private readonly usersService: UsersService,
     private readonly friendsService: FriendsService,
   ) {}
@@ -49,12 +51,27 @@ export class ChatConversationService {
     );
 
     const conversations = await this.conversationsService.findByUser(userId);
-    client.emit(
-      'conversationsList',
-      conversations.map((c) => ConversationMapper.toPayload(c as any)),
-    );
+    const list = await this._conversationsWithUnread(conversations, userId);
+    client.emit('conversationsList', list);
 
     client.emit('openConversation', { conversationId: conversation.id });
+  }
+
+  private async _conversationsWithUnread(
+    conversations: any[],
+    userId: number,
+  ): Promise<any[]> {
+    const result: any[] = [];
+    for (const conv of conversations) {
+      const unreadCount = await this.messagesService.countUnreadForRecipient(
+        conv.id,
+        userId,
+      );
+      result.push(
+        ConversationMapper.toPayload(conv, { unreadCount }),
+      );
+    }
+    return result;
   }
 
   async handleGetConversations(client: Socket) {
@@ -72,9 +89,7 @@ export class ChatConversationService {
       `handleGetConversations: found ${conversations.length} conversations for userId=${userId}`,
     );
 
-    const list = conversations.map((conv) =>
-      ConversationMapper.toPayload(conv as any),
-    );
+    const list = await this._conversationsWithUnread(conversations, userId);
     client.emit('conversationsList', list);
   }
 
@@ -132,18 +147,17 @@ export class ChatConversationService {
     await this.conversationsService.delete(data.conversationId);
 
     const conversations = await this.conversationsService.findByUser(userId);
-    client.emit(
-      'conversationsList',
-      conversations.map((c) => ConversationMapper.toPayload(c as any)),
-    );
+    const list = await this._conversationsWithUnread(conversations, userId);
+    client.emit('conversationsList', list);
 
     if (otherUserSocketId) {
       const otherConversations =
         await this.conversationsService.findByUser(otherUserId);
-      server.to(otherUserSocketId).emit(
-        'conversationsList',
-        otherConversations.map((c) => ConversationMapper.toPayload(c as any)),
+      const otherList = await this._conversationsWithUnread(
+        otherConversations,
+        otherUserId,
       );
+      server.to(otherUserSocketId).emit('conversationsList', otherList);
     }
 
     const friends = await this.friendsService.getFriends(userId);
