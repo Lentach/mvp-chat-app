@@ -11,8 +11,9 @@ RUN flutter pub get && \
 # Copy source code
 COPY . .
 
-# Build for web
-RUN flutter build web --dart-define=BASE_URL= --release
+# Build for web with BASE_URL from build arg
+ARG BASE_URL=http://localhost:3000
+RUN flutter build web --dart-define=BASE_URL=${BASE_URL} --release
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine

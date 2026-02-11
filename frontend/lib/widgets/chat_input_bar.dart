@@ -57,10 +57,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     chat.sendMessage(text, expiresIn: expiresIn);
 
     _controller.clear();
-    // Keep focus on the text field so user can type the next message immediately
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
+    // Keep focus immediately - prevents keyboard from closing on mobile
+    if (mounted && _focusNode.canRequestFocus) {
+      _focusNode.requestFocus();
+    }
   }
 
   void _toggleActionPanel() {

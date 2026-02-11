@@ -1,6 +1,8 @@
-# docker-compose.yml — runs PostgreSQL + NestJS backend + Flutter frontend
+# docker-compose.yml — Hybrid mode
+# Backend: dev mode (hot reload) | Frontend: production (works on phone)
+# Usage: docker-compose up
+
 services:
-  # PostgreSQL database
   db:
     image: postgres:16-alpine
     environment:
@@ -12,9 +14,10 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  # NestJS backend
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     ports:
       - '3000:3000'
     environment:
@@ -24,20 +27,32 @@ services:
       DB_PASS: postgres
       DB_NAME: chatdb
       JWT_SECRET: my-super-secret-jwt-key-change-in-production
-      ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8080,http://192.168.1.11:8080'
+      ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:8080,http://192.168.1.11:3000,http://192.168.1.11:8080'
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     depends_on:
       - db
+    volumes:
+      # Mount backend for hot reload
+      - ./backend:/app
+      - /app/node_modules
 
-  # Flutter web frontend (nginx)
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     ports:
       - '8080:80'
+    environment:
+      BASE_URL: http://192.168.1.11:3000
     depends_on:
       - backend
+    volumes:
+      # Mount source for auto-rebuild
+      - ./frontend:/app
+      - /app/.dart_tool
+      - /app/build
 
 volumes:
   pgdata:

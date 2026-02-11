@@ -32,6 +32,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _showScrollToBottomButton = false;
   int _newMessagesCount = 0;
   int _lastMessageCount = 0;
+  double _lastKeyboardHeight = 0;
   static const double _scrollToBottomThreshold = 80;
 
   void _onScroll() {
@@ -46,11 +47,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void _onNewMessages(int currentCount, int added) {
     if (added <= 0) return;
     _lastMessageCount = currentCount;
-    if (!_showScrollToBottomButton) {
-      _scrollToBottom();
-    } else {
-      setState(() => _newMessagesCount += added);
-    }
+    // Always scroll to bottom for new messages (especially after sending)
+    _scrollToBottom();
   }
 
   @override
@@ -103,21 +101,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   void _scrollToBottom() {
     if (mounted) setState(() => _newMessagesCount = 0);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+    // Delay scroll to give time for message to render and avoid stealing keyboard focus
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
       if (mounted) setState(() => _lastMessageCount = context.read<ChatProvider>().messages.length);
     });
   }
 
   Widget _buildScrollToBottomButton() {
     return Positioned(
-      bottom: 72,
+      bottom: 140,
       right: 16,
       child: Material(
         elevation: 2,
@@ -221,18 +219,41 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final auth = context.watch<AuthProvider>();
     final messages = chat.messages;
     final contactName = _getContactName();
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
     if (messages.isNotEmpty && messages.length != _lastMessageCount) {
       final added = messages.length - _lastMessageCount;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (_lastMessageCount == 0) {
+        // Don't skip scroll on first message (when _lastMessageCount == 0)
+        // Only skip if we're just initializing (added would be very large)
+        if (_lastMessageCount == 0 && added > 10) {
           _lastMessageCount = messages.length;
           return;
         }
         _onNewMessages(messages.length, added);
       });
     }
+
+    // Auto-scroll when keyboard opens to keep newest message visible
+    if (keyboardHeight > 0 && _lastKeyboardHeight == 0 && messages.isNotEmpty) {
+      // Keyboard just opened - scroll to bottom after layout settles
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Wait for keyboard animation to finish
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (!mounted || !_scrollController.hasClients) return;
+          final maxExtent = _scrollController.position.maxScrollExtent;
+          if (maxExtent > 0) {
+            _scrollController.animateTo(
+              maxExtent,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      });
+    }
+    _lastKeyboardHeight = keyboardHeight;
 
     final isDark = RpgTheme.isDark(context);
     final colorScheme = Theme.of(context).colorScheme;
@@ -241,47 +262,54 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final mutedColor =
         isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
-    final body = Column(
-      children: [
-        Expanded(
-          child: Container(
-            color: messagesAreaBg,
-            child: messages.isEmpty
-                ? Center(
-                    child: Text(
-                      'No messages yet',
-                      style: RpgTheme.bodyFont(
-                        fontSize: 14,
-                        color: mutedColor,
+    final body = SafeArea(
+      child: Column(
+        children: [
+          Expanded(
+            child: Container(
+              color: messagesAreaBg,
+              child: messages.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No messages yet',
+                        style: RpgTheme.bodyFont(
+                          fontSize: 14,
+                          color: mutedColor,
+                        ),
                       ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.only(
+                        left: 12,
+                        right: 12,
+                        top: 8,
+                        bottom: 8,
+                      ),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index];
+                        final showDate = index == 0 ||
+                            _isDifferentDay(
+                              messages[index - 1].createdAt,
+                              msg.createdAt,
+                            );
+                        return Column(
+                          children: [
+                            if (showDate) MessageDateSeparator(date: msg.createdAt),
+                            ChatMessageBubble(
+                              message: msg,
+                              isMine: msg.senderId == auth.currentUser!.id,
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = messages[index];
-                      final showDate = index == 0 ||
-                          _isDifferentDay(
-                            messages[index - 1].createdAt,
-                            msg.createdAt,
-                          );
-                      return Column(
-                        children: [
-                          if (showDate) MessageDateSeparator(date: msg.createdAt),
-                          ChatMessageBubble(
-                            message: msg,
-                            isMine: msg.senderId == auth.currentUser!.id,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+            ),
           ),
-        ),
-        const ChatInputBar(),
-      ],
+          const ChatInputBar(),
+        ],
+      ),
     );
 
     final otherUser = _getOtherUser();
@@ -343,6 +371,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         centerTitle: true,
         leading: IconButton(
