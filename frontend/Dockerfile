@@ -5,15 +5,15 @@ WORKDIR /app
 
 # Copy dependency files first for better layer caching
 COPY pubspec.* ./
-RUN flutter pub get && \
-    flutter pub cache clean --force
+RUN flutter pub get
 
 # Copy source code
 COPY . .
 
 # Build for web with BASE_URL from build arg
 ARG BASE_URL=http://localhost:3000
-RUN flutter build web --dart-define=BASE_URL=${BASE_URL} --release
+RUN flutter build web --dart-define=BASE_URL=${BASE_URL} --release && \
+    flutter pub cache clean --force
 
 # Stage 2: Serve with nginx
 FROM nginx:alpine
