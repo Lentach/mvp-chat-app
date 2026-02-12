@@ -77,7 +77,18 @@
       "Bash(claude mcp add:*)",
       "Bash(dir:*)",
       "Bash(ls \"C:\\\\Users\\\\Lentach\\\\desktop\\\\mvp-chat-app\\\\frontend\\\\test\\\\models\"\" 2>&1 || echo \"models test directory not found \")",
-      "Bash(flutter test:*)"
+      "Bash(flutter test:*)",
+      "Bash(du:*)",
+      "Bash(docker-compose:*)",
+      "Bash(powershell \"Get-Content ''C:\\\\Users\\\\Lentach\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Lentach-desktop-mvp-chat-app\\\\tasks\\\\bbc77f4.output'' -Tail 50\")",
+      "Bash(where:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(powershell:*)",
+      "Bash(timeout 10 tail:*)",
+      "Bash(claude mcp:*)",
+      "Bash(claude plugin:*)",
+      "Bash(start:*)",
+      "Bash(ls:*)"
     ]
   }
 }
