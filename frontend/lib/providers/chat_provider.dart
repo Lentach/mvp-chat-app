@@ -329,6 +329,7 @@ class ChatProvider extends ChangeNotifier {
         debugPrint('[ChatProvider] Received disappearingTimerUpdated event');
         _handleDisappearingTimerUpdated(data);
       },
+      onConversationDeleted: _handleConversationDeleted,
       onDisconnect: (_) => _onDisconnect(),
     );
   }
@@ -542,23 +543,36 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _handleConversationDeleted(dynamic data) {
+    final convId = data['conversationId'] as int;
+    debugPrint('[ChatProvider] Conversation deleted: $convId');
+
+    // Remove from conversations list
+    _conversations.removeWhere((c) => c.id == convId);
+
+    // Remove all messages for this conversation
+    _messages.removeWhere((m) => m.conversationId == convId);
+
+    // Remove from last messages
+    _lastMessages.remove(convId);
+
+    // Remove from unread counts
+    _unreadCounts.remove(convId);
+
+    // Clear active conversation if it was deleted
+    if (_activeConversationId == convId) {
+      _activeConversationId = null;
+    }
+
+    notifyListeners();
+  }
+
   void startConversation(String recipientEmail) {
     _socketService.startConversation(recipientEmail);
   }
 
-  void deleteConversation(int conversationId) {
-    // Optimistic UI update
-    _conversations.removeWhere((c) => c.id == conversationId);
-    _lastMessages.remove(conversationId);
-    _unreadCounts.remove(conversationId);
-
-    if (_activeConversationId == conversationId) {
-      _activeConversationId = null;
-      _messages = [];
-    }
-
-    notifyListeners();
-    _socketService.deleteConversation(conversationId);
+  void deleteConversationOnly(int conversationId) {
+    _socketService.emitDeleteConversationOnly(conversationId);
   }
 
   void sendFriendRequest(String recipientEmail) {
