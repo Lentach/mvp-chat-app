@@ -5,7 +5,7 @@ import { ConversationsService } from '../../conversations/conversations.service'
 import { FriendsService } from '../../friends/friends.service';
 import { UsersService } from '../../users/users.service';
 import { validateDto } from '../utils/dto.validator';
-import { SendMessageDto, GetMessagesDto } from '../dto/chat.dto';
+import { SendMessageDto, GetMessagesDto, ClearChatHistoryDto } from '../dto/chat.dto';
 import { SendPingDto } from '../dto/send-ping.dto';
 import { MessageType, MessageDeliveryStatus } from '../../messages/message.entity';
 
@@ -328,5 +328,64 @@ export class ChatMessageService {
         });
       }
     }
+  }
+
+  async handleClearChatHistory(
+    client: Socket,
+    data: any,
+    server: Server,
+    onlineUsers: Map<number, string>,
+  ) {
+    const userId: number = client.data.user?.id;
+    if (!userId) return;
+
+    try {
+      const dto = validateDto(ClearChatHistoryDto, data);
+      data = dto;
+    } catch (error) {
+      client.emit('error', { message: error.message });
+      return;
+    }
+
+    // Verify user belongs to this conversation
+    const conversation = await this.conversationsService.findById(
+      data.conversationId,
+    );
+    if (!conversation) {
+      client.emit('error', { message: 'Conversation not found' });
+      return;
+    }
+
+    const userBelongs =
+      conversation.userOne.id === userId ||
+      conversation.userTwo.id === userId;
+    if (!userBelongs) {
+      client.emit('error', { message: 'Unauthorized' });
+      return;
+    }
+
+    // Delete all messages
+    await this.messagesService.deleteAllByConversation(data.conversationId);
+
+    // Emit to both users
+    const otherUserId =
+      conversation.userOne.id === userId
+        ? conversation.userTwo.id
+        : conversation.userOne.id;
+
+    const payload = { conversationId: data.conversationId };
+
+    // Emit to initiating user
+    client.emit('chatHistoryCleared', payload);
+
+    // Emit to other user if online
+    const otherUserSocketId = onlineUsers.get(otherUserId);
+    if (otherUserSocketId) {
+      server.to(otherUserSocketId).emit('chatHistoryCleared', payload);
+    }
+
+    this.logger.debug(
+      `User ${userId} cleared chat history for conversation ${data.conversationId}`,
+    );
   }
 }
