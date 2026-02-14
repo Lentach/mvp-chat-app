@@ -1,6 +1,6 @@
 # CLAUDE.md — MVP Chat App
 
-**Last updated:** 2026-02-12
+**Last updated:** 2026-02-14
 
 **Rule:** Update this file after every code change. Single source of truth for agents. **A future agent must be able to read ONLY this file and understand the current state of the project without reading every source file.**
 
@@ -25,37 +25,40 @@
 
 ## 2. Quick Start
 
-**Stack:** NestJS + Flutter + PostgreSQL + Socket.IO + JWT. Mobile-first, web optional.
+**Stack:** NestJS + Flutter + PostgreSQL + Socket.IO + JWT. Web-first (dev), mobile later.
 
-**Structure:** `backend/` :3000, `frontend/` Flutter app (run locally or build for web :8080). Manual E2E scripts in `scripts/` (see `scripts/README.md`).
+**Structure:** `backend/` :3000, `frontend/` Flutter app (web dev mode). Manual E2E scripts in `scripts/` (see `scripts/README.md`).
 
-**Development workflow:**
+**Development workflow (current - web focused):**
 
-1. **Start backend + DB** (always):
+1. **Start backend + DB** (Terminal 1 - auto hot-reload):
    ```bash
    docker-compose up
    ```
-   Backend: http://192.168.1.11:3000 (accessible from phone)
+   Backend: http://localhost:3000 (NestJS watch mode - auto reloads on file changes)
 
-2. **Run Flutter on device** (mobile dev - recommended):
+2. **Run Flutter web** (Terminal 2 - manual hot-reload):
    ```bash
    cd frontend
-   flutter devices  # List available devices
-   flutter run -d <device-id>  # Hot-reload enabled
+   flutter run -d chrome
    ```
+   Frontend: http://localhost:<random-port> (check terminal output)
+   **Hot-reload:** Press `r` in terminal after code changes (auto hot-reload not working on web)
 
-3. **Or run web build** (optional, for web testing):
+**Mobile workflow (on hold - network issues):**
    ```bash
-   docker-compose -f docker-compose.web.yml up --build
+   # Will return to this when local network config is resolved
+   cd frontend
+   flutter devices
+   flutter run -d <device-id>  # Auto hot-reload works on mobile
    ```
-   Frontend: http://192.168.1.11:8080
 
 **Before run:**
 - Kill existing node processes: `taskkill //F //IM node.exe`
-- Ensure phone/computer on same WiFi network
-- Update `BASE_URL` in flutter run: `--dart-define=BASE_URL=http://192.168.1.11:3000`
+- **Web dev:** No network config needed (localhost)
+- **Mobile dev (later):** Ensure phone/computer on same WiFi, update BASE_URL IP
 
-**Frontend config:** `BASE_URL` via dart-define or hardcoded default. JWT stored in SharedPreferences (`jwt_token`).
+**Frontend config:** `BASE_URL` defaults to localhost:3000 for web dev. JWT stored in SharedPreferences (`jwt_token`).
 
 ---
 
@@ -443,7 +446,13 @@ Telegram/Wire-inspired UI with delivery indicators, disappearing messages, ping 
 
 ---
 
-## 13. Recent Changes (2026-02-08)
+## 13. Recent Changes
+
+**2026-02-14:**
+
+- **Delete chat history feature (2026-02-14):** Added long-press action tile in ChatActionTiles to permanently delete all messages in a conversation for both users. Frontend: `_LongPressActionTile` widget with 1.5s long-press gesture, circular red progress animation via `CircularProgressPainter`. Backend: New `clearChatHistory` WebSocket event, `MessagesService.deleteAllByConversation()` method. Real-time sync via WebSocket - both users see messages disappear. Silent fallback on errors (local delete only, messages return on refresh). First position in action tiles (before Timer). Files: chat_action_tiles.dart, chat_provider.dart, socket_service.dart, chat-message.service.ts, messages.service.ts, chat.gateway.ts, chat.dto.ts. Design doc: docs/plans/2026-02-14-delete-chat-history-design.md.
+
+**2026-02-08:**
 
 - **Unread message badge (2026-02-08):** Conversation list now shows a badge with the count of unread messages (e.g. "4") when user B has new messages from A and was not in the app or not viewing that chat. Backend: `MessagesService.countUnreadForRecipient` counts messages where sender ≠ current user and deliveryStatus ≠ READ (excluding expired). `conversationsList` payload includes `unreadCount` per conversation. Frontend: `ChatProvider._unreadCounts` stores counts from backend + increments on `newMessage` when chat not active; clears on `openConversation`. `ConversationTile` displays orange badge with count (or "99+"). Files: messages.service.ts, conversation.mapper.ts, chat-conversation.service.ts, chat_provider.dart, conversation_tile.dart, conversations_screen.dart.
 
