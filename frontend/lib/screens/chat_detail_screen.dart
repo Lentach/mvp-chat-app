@@ -182,35 +182,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return chat.getOtherUser(conv);
   }
 
-  void _unfriend() {
-    final otherUserId = _getOtherUserId();
-    final otherUsername = _getContactName();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Unfriend $otherUsername?'),
-        content: const Text('This will delete your entire conversation history.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<ChatProvider>().unfriend(otherUserId);
-              if (!widget.isEmbedded && mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Unfriend', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
   bool _isDifferentDay(DateTime a, DateTime b) {
     return a.year != b.year || a.month != b.month || a.day != b.day;
   }
@@ -401,26 +372,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               radius: 18,
               profilePictureUrl: otherUser?.profilePictureUrl,
             ),
-          ),
-          // Menu (three dots)
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'unfriend') {
-                _unfriend();
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'unfriend',
-                child: Row(
-                  children: [
-                    Icon(Icons.person_remove, color: Colors.red),
-                    const SizedBox(width: 8),
-                    const Text('Unfriend'),
-                  ],
-                ),
-              ),
-            ],
           ),
         ],
       ),
