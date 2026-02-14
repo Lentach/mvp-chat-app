@@ -118,7 +118,7 @@ flowchart TB
 flowchart LR
   AuthGate --> |isLoggedIn| MainShell
   MainShell --> |index 0| ConversationsScreen
-  MainShell --> |index 1| ArchivePlaceholderScreen
+  MainShell --> |index 1| ContactsScreen
   MainShell --> |index 2| SettingsScreen
 
   ConversationsScreen --> |plus| AddOrInvitationsScreen
@@ -127,10 +127,13 @@ flowchart LR
   ConversationsScreen --> |tap conversation / mobile| ChatDetailScreen
   ConversationsScreen --> |desktop| ChatDetailScreen embedded
 
+  ContactsScreen --> |tap contact| ChatDetailScreen
+  ContactsScreen --> |long-press| Unfriend dialog
+
   SettingsScreen --> |Logout| AuthGate
 ```
 
-- **Mobile:** Bottom nav always visible. Conversations tab = custom header + list. Plus → AddOrInvitationsScreen (push). Tap conversation → push ChatDetailScreen.
+- **Mobile:** Bottom nav always visible. Conversations tab = custom header + list. Plus → AddOrInvitationsScreen (push). Tap conversation → push ChatDetailScreen. Contacts tab = friends list. Tap contact → open chat; long-press → unfriend dialog.
 - **Desktop:** Same MainShell; ConversationsScreen shows sidebar (header + list) + embedded ChatDetailScreen in right pane. Breakpoint: `AppConstants.layoutBreakpointDesktop` (600px).
 
 ### 3.3 Auth flow
@@ -225,7 +228,7 @@ erDiagram
 | **startConversation** | ChatConversationService.handleStartConversation | `conversationsList`, `openConversation` { conversationId } | — |
 | **getConversations** | ChatConversationService.handleGetConversations | `conversationsList` (array) | — |
 | **startConversation** | ChatConversationService.handleStartConversation | `conversationsList`, `openConversation` { conversationId } | — |
-| **deleteConversation** | ChatConversationService.handleDeleteConversation | `conversationsList`, `unfriended` { userId } | To other user: `unfriended` { userId }; then both get new `conversationsList` |
+| **deleteConversationOnly** | ChatConversationService.handleDeleteConversationOnly | `conversationDeleted` { conversationId }, `conversationsList` | To other user: `conversationDeleted` { conversationId }, `conversationsList` |
 | **sendFriendRequest** | ChatFriendRequestService.handleSendFriendRequest | If pending: `friendRequestSent` (payload). If auto-accept: `friendRequestAccepted`, `friendsList`, `conversationsList`, `openConversation` { conversationId }, `pendingRequestsCount` { count } | To recipient if pending: `newFriendRequest`, `pendingRequestsCount`. If auto-accept: recipient gets `friendRequestAccepted`, `friendsList`, `conversationsList`, `openConversation`, `pendingRequestsCount` |
 | **acceptFriendRequest** | ChatFriendRequestService.handleAcceptFriendRequest | `friendRequestAccepted`, `friendsList`, `conversationsList`, `openConversation` { conversationId }, `pendingRequestsCount` | To sender: `friendRequestAccepted`, `friendsList`, `conversationsList`, `openConversation`, `pendingRequestsCount` |
 | **rejectFriendRequest** | ChatFriendRequestService.handleRejectFriendRequest | `friendRequestRejected`, `friendRequestsList`, `pendingRequestsCount` | — |
@@ -240,6 +243,7 @@ erDiagram
 - **messageSent / newMessage:** `{ id, content, senderId, senderEmail, senderUsername, conversationId, createdAt }`
 - **conversationsList:** array of `{ id, userOne, userTwo }` (user objects with id, email, username, profilePictureUrl).
 - **openConversation:** `{ conversationId: number }`
+- **conversationDeleted:** `{ conversationId: number }`
 - **error:** `{ message: string }`
 - **pendingRequestsCount:** `{ count: number }`
 - **friendRequestAccepted / newFriendRequest / friendRequestSent:** FriendRequest payload (id, sender, receiver, status).
@@ -301,6 +305,12 @@ erDiagram
 
 - **RpgTheme:** themeData (dark), themeDataLight. SettingsProvider.themeMode drives MaterialApp.themeMode. Breakpoint 600px: layoutBreakpointDesktop. Conversations list separator: Divider with convItemBorderDark / convItemBorderLight.
 
+### 7.8 Delete Conversation vs Unfriend
+
+- **Delete conversation (Conversations tab):** Swipe-to-delete → calls `deleteConversationOnly()` → removes only chat history (messages + conversation entity), preserves friend_request. Friend remains in Contacts tab.
+- **Unfriend (Contacts tab):** Long-press → dialog → calls `unfriend(userId)` → removes friend_request + conversation + messages. Total delete, need new friend request to re-connect.
+- **Re-opening chat:** After delete conversation, tapping contact in Contacts tab calls `startConversation()` → backend creates new empty conversation (friendship still exists).
+
 ---
 
 ## 8. Backend Mechanisms (Detail)
@@ -359,9 +369,11 @@ erDiagram
 | Post-login shell / bottom nav | screens/main_shell.dart |
 | Conversations list / header / plus | screens/conversations_screen.dart |
 | Add by email + Friend requests tabs | screens/add_or_invitations_screen.dart |
-| Archive placeholder | screens/archive_placeholder_screen.dart |
+| Contacts screen | screens/contacts_screen.dart |
 | Settings / logout | screens/settings_screen.dart |
 | Chat thread UI | screens/chat_detail_screen.dart |
+| Delete conversation (history only) | chat/services/chat-conversation.service.ts (handleDeleteConversationOnly), chat_provider.dart, socket_service.dart |
+| Swipe-to-delete | widgets/conversation_tile.dart (Dismissible) |
 | Socket connection / events | services/socket_service.dart, providers/chat_provider.dart |
 | Auth state / login / register | providers/auth_provider.dart, services/api_service.dart |
 | Theme / colors | theme/rpg_theme.dart, providers/settings_provider.dart |
@@ -449,6 +461,12 @@ Telegram/Wire-inspired UI with delivery indicators, disappearing messages, ping 
 ## 13. Recent Changes
 
 **2026-02-14:**
+
+- **Contacts tab replaces Archive (2026-02-14):** New Contacts tab shows all friends from `ChatProvider.friends`. Long-press contact to unfriend (total delete: friend_request + conversation + messages). Tap contact to open chat (creates new conversation if needed). Frontend: `ContactsScreen`, `MainShell` updated. Design doc: docs/plans/2026-02-14-contacts-tab-design.md, implementation plan: docs/plans/2026-02-14-contacts-tab-implementation.md.
+
+- **Swipe-to-delete conversations (2026-02-14):** Conversations tab now uses swipe-to-delete gesture (left-to-right) instead of delete icon. Shows confirmation dialog, then calls `deleteConversationOnly` WebSocket event. Removes only chat history (messages + conversation entity), preserves friend_request so friend remains in Contacts. Backend: new `DeleteConversationOnlyDto`, `handleDeleteConversationOnly` method. Frontend: `ConversationTile` wrapped in `Dismissible` widget. Files: chat-conversation.service.ts, conversation_tile.dart, chat_provider.dart, socket_service.dart.
+
+- **Remove unfriend from chat screen (2026-02-14):** Three-dot menu and unfriend option removed from `ChatDetailScreen`. Unfriend now only available from Contacts tab (long-press). Simplifies chat UI, clear separation of concerns. Files: chat_detail_screen.dart.
 
 - **Delete chat history feature (2026-02-14):** Added long-press action tile in ChatActionTiles to permanently delete all messages in a conversation for both users. Frontend: `_LongPressActionTile` widget with 1.5s long-press gesture, circular red progress animation via `CircularProgressPainter`. Backend: New `clearChatHistory` WebSocket event, `MessagesService.deleteAllByConversation()` method. Real-time sync via WebSocket - both users see messages disappear. Silent fallback on errors (local delete only, messages return on refresh). First position in action tiles (before Timer). Files: chat_action_tiles.dart, chat_provider.dart, socket_service.dart, chat-message.service.ts, messages.service.ts, chat.gateway.ts, chat.dto.ts. Design doc: docs/plans/2026-02-14-delete-chat-history-design.md.
 
