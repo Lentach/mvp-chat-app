@@ -139,7 +139,9 @@ class ConversationTile extends StatelessWidget {
                     if (lastMessage != null) ...[
                       const SizedBox(height: 3),
                       Text(
-                        lastMessage!.content,
+                        lastMessage!.messageType == MessageType.ping
+                            ? 'PING!'
+                            : lastMessage!.content,
                         style: RpgTheme.bodyFont(
                           fontSize: 13,
                           color: secondaryColor,
