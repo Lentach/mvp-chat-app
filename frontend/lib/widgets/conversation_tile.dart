@@ -40,7 +40,73 @@ class ConversationTile extends StatelessWidget {
     final activeBg = isDark ? RpgTheme.activeTabBgDark : RpgTheme.activeTabBgLight;
     final secondaryColor = isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
-    return Material(
+    return Dismissible(
+      key: Key('conv-tile-$displayName'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            final colorScheme = Theme.of(dialogContext).colorScheme;
+            final isDark = RpgTheme.isDark(dialogContext);
+            final mutedColor =
+                isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
+            return AlertDialog(
+              backgroundColor: colorScheme.surface,
+              title: Text(
+                'Delete Conversation?',
+                style: RpgTheme.bodyFont(
+                  fontSize: 16,
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              content: Text(
+                'This will delete all messages in this conversation. You can re-open the chat later from Contacts.',
+                style: RpgTheme.bodyFont(
+                  fontSize: 14,
+                  color: colorScheme.onSurface.withValues(alpha: 0.8),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(
+                    'Cancel',
+                    style: RpgTheme.bodyFont(fontSize: 14, color: mutedColor),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: Text(
+                    'Delete',
+                    style: RpgTheme.bodyFont(
+                      fontSize: 14,
+                      color: RpgTheme.accentDark,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      onDismissed: (direction) => onDelete(),
+      child: Material(
       color: isActive ? activeBg : Colors.transparent,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
@@ -124,21 +190,13 @@ class ConversationTile extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    color: RpgTheme.accentDark,
-                    onPressed: onDelete,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    tooltip: 'Delete conversation',
-                  ),
                 ],
               ),
             ],
           ),
         ),
       ),
+    ),
     );
   }
 }

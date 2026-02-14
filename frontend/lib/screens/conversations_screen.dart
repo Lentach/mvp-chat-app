@@ -53,56 +53,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   void _deleteConversation(int conversationId) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final colorScheme = Theme.of(dialogContext).colorScheme;
-        final mutedColor = RpgTheme.isDark(dialogContext)
-            ? RpgTheme.mutedDark
-            : RpgTheme.textSecondaryLight;
-        return AlertDialog(
-          backgroundColor: colorScheme.surface,
-          title: Text(
-            'Delete Conversation?',
-            style: RpgTheme.bodyFont(
-              fontSize: 16,
-              color: colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: Text(
-            'This will delete all messages. This action cannot be undone.',
-            style: RpgTheme.bodyFont(
-              fontSize: 14,
-              color: colorScheme.onSurface.withValues(alpha: 0.8),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: RpgTheme.bodyFont(fontSize: 14, color: mutedColor),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                context.read<ChatProvider>().deleteConversation(conversationId);
-              },
-              child: Text(
-                'Delete',
-                style: RpgTheme.bodyFont(
-                  fontSize: 14,
-                  color: RpgTheme.accentDark,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+    // Dialog is handled by Dismissible widget in ConversationTile
+    // This method is called after user confirms in swipe-to-delete dialog
+    context.read<ChatProvider>().deleteConversationOnly(conversationId);
   }
 
   @override
