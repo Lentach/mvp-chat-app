@@ -27,6 +27,7 @@ class SocketService {
     required void Function(dynamic) onUnfriended,
     required void Function(dynamic) onMessageDelivered,
     required void Function(dynamic) onPingReceived,
+    required void Function(dynamic) onPingSent,
     required void Function(dynamic) onChatHistoryCleared,
   }) {
     // Defensive cleanup: ensure any previous socket is fully disposed
@@ -65,6 +66,7 @@ class SocketService {
     _socket!.on('unfriended', onUnfriended);
     _socket!.on('messageDelivered', onMessageDelivered);
     _socket!.on('newPing', onPingReceived);
+    _socket!.on('pingSent', onPingSent);
     _socket!.on('chatHistoryCleared', onChatHistoryCleared);
     _socket!.onDisconnect(onDisconnect);
 

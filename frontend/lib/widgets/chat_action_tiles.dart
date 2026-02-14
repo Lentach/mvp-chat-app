@@ -91,8 +91,6 @@ class ChatActionTiles extends StatelessWidget {
     final recipientId = chat.getOtherUserId(conv);
 
     chat.sendPing(recipientId);
-
-    showTopSnackBar(context, 'Ping sent!');
   }
 
   Future<void> _pickAttachment(BuildContext context) async {

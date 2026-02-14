@@ -79,7 +79,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (oldWidget.conversationId != widget.conversationId) {
       _lastMessageCount = 0;
       _newMessagesCount = 0;
-      context.read<ChatProvider>().openConversation(widget.conversationId);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<ChatProvider>().openConversation(widget.conversationId);
+      });
       _scrollToBottomOnce();
     }
   }

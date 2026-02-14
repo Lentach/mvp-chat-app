@@ -318,6 +318,7 @@ class ChatProvider extends ChangeNotifier {
       },
       onMessageDelivered: _handleMessageDelivered,
       onPingReceived: _handlePingReceived,
+      onPingSent: _handlePingReceived,
       onChatHistoryCleared: (data) {
         debugPrint('[ChatProvider] Received chatHistoryCleared event');
         _handleChatHistoryCleared(data);
