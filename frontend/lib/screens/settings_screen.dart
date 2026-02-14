@@ -157,11 +157,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       child: ListTile(
-        leading: Icon(icon, color: colorScheme.primary, size: 19),
+        leading: Icon(icon, color: colorScheme.primary, size: 24),
         title: Text(
           title,
           style: RpgTheme.bodyFont(
-            fontSize: 11,
+            fontSize: 14,
             color: textColor ?? colorScheme.onSurface,
             fontWeight: FontWeight.w500,
           ),
@@ -170,7 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? Text(
                 subtitle,
                 style: RpgTheme.bodyFont(
-                  fontSize: 10,
+                  fontSize: 12,
                   color: colorScheme.onSurfaceVariant,
                 ),
               )
