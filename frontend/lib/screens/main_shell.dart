@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'archive_placeholder_screen.dart';
+import 'contacts_screen.dart';
 import 'conversations_screen.dart';
 import 'settings_screen.dart';
 
-/// Shell after login: bottom nav with Conversations, Archive, Settings.
+/// Shell after login: bottom nav with Conversations, Contacts, Settings.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -25,7 +25,7 @@ class _MainShellState extends State<MainShell> {
           ConversationsScreen(
             onAvatarTap: () => setState(() => _selectedIndex = 2),
           ),
-          const ArchivePlaceholderScreen(),
+          const ContactsScreen(),
           const SettingsScreen(),
         ],
       ),
@@ -43,8 +43,9 @@ class _MainShellState extends State<MainShell> {
             label: 'Conversations',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.archive_outlined),
-            label: 'Archive',
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
+            label: 'Contacts',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
