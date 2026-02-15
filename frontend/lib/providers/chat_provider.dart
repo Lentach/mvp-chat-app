@@ -467,8 +467,13 @@ class ChatProvider extends ChangeNotifier {
 
     // 3. Upload to backend in background
     try {
+      if (_tokenForReconnect == null) {
+        throw Exception('No authentication token available');
+      }
+
       final api = ApiService(baseUrl: AppConfig.baseUrl);
       final result = await api.uploadVoiceMessage(
+        token: _tokenForReconnect!,
         audioPath: localAudioPath,
         duration: duration,
         expiresIn: effectiveExpiresIn,
