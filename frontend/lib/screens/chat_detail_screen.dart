@@ -198,12 +198,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final added = messages.length - _lastMessageCount;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        // Don't skip scroll on first message (when _lastMessageCount == 0)
-        // Only skip if we're just initializing (added would be very large)
-        if (_lastMessageCount == 0 && added > 10) {
-          _lastMessageCount = messages.length;
-          return;
-        }
+        // Always scroll to bottom when message count changes (including initial load)
+        // so the user sees the newest message when entering the chat.
         _onNewMessages(messages.length, added);
       });
     }
