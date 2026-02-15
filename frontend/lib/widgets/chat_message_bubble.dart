@@ -203,10 +203,20 @@ class ChatMessageBubble extends StatelessWidget {
                 style: RpgTheme.bodyFont(fontSize: 14, color: textColor),
               ),
             // Retry button for failed messages
-            if (_buildRetryButton(context) != null) ...[
-              const SizedBox(height: 4),
-              _buildRetryButton(context)!,
-            ],
+            Builder(
+              builder: (ctx) {
+                final retryBtn = _buildRetryButton(ctx);
+                if (retryBtn == null) return const SizedBox.shrink();
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    retryBtn,
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 4),
             // Bottom row: time + delivery + timer
             Align(

@@ -36,7 +36,9 @@ class _ChatInputBarState extends State<ChatInputBar>
   AudioRecorder? _audioRecorder;
   String? _recordingPath;
   Timer? _recordingTimer;
-  int _recordingDuration = 0; // seconds
+  DateTime? _recordingStartTime;
+  ValueNotifier<int>? _recordingSecondsNotifier; // survives overlay rebuilds
+  int _recordingDuration = 0;
   OverlayEntry? _recordingOverlay;
 
   @override
@@ -64,6 +66,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _focusNode.dispose();
     _actionPanelController.dispose();
     _recordingTimer?.cancel();
+    _recordingSecondsNotifier?.dispose();
     _audioRecorder?.dispose();
     _recordingOverlay?.remove();
     super.dispose();
@@ -136,28 +139,22 @@ class _ChatInputBarState extends State<ChatInputBar>
         path: _recordingPath!,
       );
 
+      _recordingStartTime = DateTime.now();
+      _recordingSecondsNotifier = ValueNotifier(0);
       setState(() {
         _isRecording = true;
         _recordingDuration = 0;
       });
 
-      // Show overlay
+      // Show overlay (ValueListenableBuilder reads from _recordingSecondsNotifier)
       _showRecordingOverlay();
 
-      // Start timer (increment every second)
+      // Timer: tick every second, update notifier + 120s auto-stop (parent-owned, survives overlay rebuilds)
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (mounted) {
-          setState(() {
-            _recordingDuration++;
-            if (_recordingDuration >= 120) {
-              // Auto-stop at 2 minutes
-              _stopRecording();
-            } else {
-              // Update overlay with new duration
-              _updateRecordingOverlay();
-            }
-          });
-        }
+        if (!mounted || _recordingStartTime == null) return;
+        final elapsed = DateTime.now().difference(_recordingStartTime!).inSeconds;
+        _recordingSecondsNotifier?.value = elapsed;
+        if (elapsed >= 120) _stopRecording();
       });
     } catch (e) {
       if (!mounted) return;
@@ -171,6 +168,8 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     _recordingTimer?.cancel();
     _recordingTimer = null;
+    _recordingSecondsNotifier?.dispose();
+    _recordingSecondsNotifier = null;
 
     final path = await _audioRecorder!.stop();
     await _audioRecorder!.dispose();
@@ -182,8 +181,14 @@ class _ChatInputBarState extends State<ChatInputBar>
       _isRecording = false;
     });
 
+    // Use actual elapsed duration for send (timer display may lag on last tick)
+    final durationSeconds = _recordingStartTime != null
+        ? DateTime.now().difference(_recordingStartTime!).inSeconds
+        : _recordingDuration;
+    _recordingStartTime = null;
+
     // Check duration
-    if (_recordingDuration < 1) {
+    if (durationSeconds < 1) {
       if (!kIsWeb && path != null) {
         try {
           final file = File(path);
@@ -206,7 +211,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         try {
           final response = await http.get(Uri.parse(path));
           if (response.statusCode == 200) {
-            await _sendVoiceMessage(duration: _recordingDuration, audioBytes: response.bodyBytes);
+            await _sendVoiceMessage(duration: durationSeconds, audioBytes: response.bodyBytes);
           } else {
             if (!mounted) return;
             showTopSnackBar(context, 'Failed to read recording');
@@ -218,7 +223,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       } else {
         final file = File(path);
         if (await file.exists()) {
-          await _sendVoiceMessage(duration: _recordingDuration, localAudioPath: path);
+          await _sendVoiceMessage(duration: durationSeconds, localAudioPath: path);
         }
       }
     }
@@ -234,6 +239,9 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     _recordingTimer?.cancel();
     _recordingTimer = null;
+    _recordingSecondsNotifier?.dispose();
+    _recordingSecondsNotifier = null;
+    _recordingStartTime = null;
 
     await _audioRecorder!.stop();
     await _audioRecorder!.dispose();
@@ -304,21 +312,14 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _showRecordingOverlay() {
+    if (_recordingSecondsNotifier == null) return;
     _recordingOverlay = OverlayEntry(
       builder: (context) => VoiceRecordingOverlay(
-        onSendVoice: (path, duration) {
-          // Not used, we handle send in _stopRecording
-        },
         onCancel: _cancelRecording,
-        recordingDuration: _recordingDuration,
+        recordingSeconds: _recordingSecondsNotifier!,
       ),
     );
     Overlay.of(context).insert(_recordingOverlay!);
-  }
-
-  void _updateRecordingOverlay() {
-    _hideRecordingOverlay();
-    _showRecordingOverlay();
   }
 
   void _hideRecordingOverlay() {

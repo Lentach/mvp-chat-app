@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../models/message_model.dart';
 import '../theme/rpg_theme.dart';
+import 'top_snackbar.dart';
 
 class VoiceMessageBubble extends StatefulWidget {
   final MessageModel message;
@@ -25,19 +26,37 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   bool _isLoading = false;
+  bool _loadCancelled = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   double _playbackSpeed = 1.0;
   String? _cachedFilePath;
+
+  /// Duration from message metadata (for display before audio loads)
+  Duration get _messageDuration =>
+      Duration(seconds: widget.message.mediaDuration ?? 0);
+
+  /// Effective duration: from player when loaded, else from message
+  Duration get _displayDuration =>
+      _duration.inMilliseconds > 0 ? _duration : _messageDuration;
 
   @override
   void initState() {
     super.initState();
     _audioPlayer.playerStateStream.listen((state) {
       if (mounted) {
+        final completed = state.processingState == ProcessingState.completed;
         setState(() {
-          _isPlaying = state.playing;
+          _isPlaying = completed ? false : state.playing;
         });
+        if (completed) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _audioPlayer.stop();
+              _audioPlayer.seek(Duration.zero);
+            }
+          });
+        }
       }
     });
 
@@ -65,6 +84,12 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   }
 
   Future<void> _togglePlayPause() async {
+    if (_isLoading) {
+      _loadCancelled = true;
+      _audioPlayer.stop();
+      setState(() => _isLoading = false);
+      return;
+    }
     if (_isPlaying) {
       await _audioPlayer.pause();
     } else {
@@ -85,11 +110,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
   Future<void> _loadAndPlayAudio() async {
     // Check if message expired
     if (_isExpired()) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Audio no longer available')),
-        );
-      }
+      if (mounted) showTopSnackBar(context, 'Audio no longer available');
       return;
     }
 
@@ -98,6 +119,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
       throw Exception('No media URL');
     }
 
+    _loadCancelled = false;
     setState(() {
       _isLoading = true;
     });
@@ -119,14 +141,12 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         }
       }
 
+      if (mounted) setState(() => _isLoading = false);
+      if (_loadCancelled || !mounted) return;
       await _audioPlayer.play();
     } catch (e) {
       print('Audio load error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load audio')),
-        );
-      }
+      if (mounted) showTopSnackBar(context, 'Failed to load audio');
     } finally {
       if (mounted) {
         setState(() {
@@ -178,6 +198,48 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
+  String _formatTime(DateTime dt) {
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  String? _getTimerText() {
+    if (widget.message.expiresAt == null) return null;
+    final now = DateTime.now();
+    final remaining = widget.message.expiresAt!.difference(now);
+    if (remaining.isNegative) return null;
+    if (remaining.inHours > 0) return '${remaining.inHours}h';
+    if (remaining.inMinutes > 0) return '${remaining.inMinutes}m';
+    return '${remaining.inSeconds}s';
+  }
+
+  Widget _buildDeliveryIcon() {
+    if (!widget.isMine) return const SizedBox.shrink();
+    if (widget.message.deliveryStatus == MessageDeliveryStatus.failed) {
+      return const Icon(Icons.error, size: 12, color: Colors.red);
+    }
+    IconData icon;
+    switch (widget.message.deliveryStatus) {
+      case MessageDeliveryStatus.sending:
+        icon = Icons.access_time;
+        break;
+      case MessageDeliveryStatus.sent:
+      case MessageDeliveryStatus.delivered:
+        icon = Icons.check;
+        break;
+      case MessageDeliveryStatus.read:
+        icon = Icons.done_all;
+        break;
+      default:
+        icon = Icons.check;
+    }
+    const Color sendingSentColor = Color(0xFFE0E0E0);
+    const Color readColor = Color(0xFF64B5F6);
+    final color = widget.message.deliveryStatus == MessageDeliveryStatus.read
+        ? readColor
+        : sendingSentColor;
+    return Icon(icon, size: 12, color: color);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = RpgTheme.isDark(context);
@@ -192,14 +254,14 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
       alignment: widget.isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+          maxWidth: MediaQuery.of(context).size.width * 0.6,
         ),
         margin: EdgeInsets.only(
           left: widget.isMine ? 48 : 0,
           right: widget.isMine ? 0 : 48,
           bottom: 4,
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.circular(16),
@@ -213,12 +275,15 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
             // Playback controls row
             Row(
               children: [
-                // Play/Pause button
+                // Play/Pause (or loading with tap-to-cancel)
                 _isLoading
-                    ? const SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                    ? GestureDetector(
+                        onTap: _togglePlayPause,
+                        child: const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                       )
                     : IconButton(
                         icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
@@ -229,69 +294,111 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
 
                 const SizedBox(width: 8),
 
-                // Waveform with progress
+                // Waveform with progress (use _displayDuration for pre-load display)
                 Expanded(
-                  child: _duration.inMilliseconds > 0
+                  child: _displayDuration.inMilliseconds > 0
                       ? CustomPaint(
                           painter: _WaveformPainter(
-                            progress: _position.inMilliseconds / _duration.inMilliseconds,
+                            progress: _displayDuration.inMilliseconds > 0
+                                ? _position.inMilliseconds /
+                                    _displayDuration.inMilliseconds
+                                : 0.0,
                             color: borderColor,
                           ),
-                          size: const Size(double.infinity, 40),
+                          size: const Size(double.infinity, 28),
                         )
                       : Container(
-                          height: 40,
+                          height: 28,
                           color: Colors.grey.withOpacity(0.1),
                         ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
 
                 // Speed toggle
                 InkWell(
                   onTap: _toggleSpeed,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       border: Border.all(color: borderColor),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${_playbackSpeed}x',
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(fontSize: 11),
                     ),
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
 
             // Duration slider
             Row(
               children: [
                 Text(
                   _formatDuration(_position),
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 11),
                 ),
                 Expanded(
                   child: Slider(
-                    value: _duration.inMilliseconds > 0
-                        ? _position.inMilliseconds / _duration.inMilliseconds
+                    value: _displayDuration.inMilliseconds > 0
+                        ? _position.inMilliseconds /
+                            _displayDuration.inMilliseconds
                         : 0.0,
-                    onChanged: (value) {
-                      final newPosition = Duration(
-                        milliseconds: (_duration.inMilliseconds * value).round(),
-                      );
-                      _audioPlayer.seek(newPosition);
-                    },
+                    onChanged: _displayDuration.inMilliseconds > 0
+                        ? (value) {
+                            final newPosition = Duration(
+                              milliseconds: (_displayDuration.inMilliseconds *
+                                      value)
+                                  .round(),
+                            );
+                            _audioPlayer.seek(newPosition);
+                          }
+                        : null,
                   ),
                 ),
                 Text(
-                  _formatDuration(_duration),
-                  style: const TextStyle(fontSize: 12),
+                  _formatDuration(_displayDuration),
+                  style: const TextStyle(fontSize: 11),
                 ),
               ],
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatTime(widget.message.createdAt),
+                    style: RpgTheme.bodyFont(
+                      fontSize: 10,
+                      color: isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  _buildDeliveryIcon(),
+                  if (_getTimerText() != null) ...[
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 10,
+                      color: isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      _getTimerText()!,
+                      style: RpgTheme.bodyFont(
+                        fontSize: 10,
+                        color: isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),

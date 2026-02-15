@@ -1,16 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../theme/rpg_theme.dart';
 
 class VoiceRecordingOverlay extends StatefulWidget {
-  final Function(String audioPath, int duration) onSendVoice;
   final VoidCallback onCancel;
-  final int recordingDuration;
+  final ValueListenable<int> recordingSeconds;
 
   const VoiceRecordingOverlay({
     super.key,
-    required this.onSendVoice,
     required this.onCancel,
-    required this.recordingDuration,
+    required this.recordingSeconds,
   });
 
   @override
@@ -43,9 +42,9 @@ class _VoiceRecordingOverlayState extends State<VoiceRecordingOverlay>
     return '${minutes}:${secs.toString().padLeft(2, '0')}';
   }
 
-  Color _getTimerColor() {
-    if (widget.recordingDuration >= 118) return Colors.red; // 1:58+
-    if (widget.recordingDuration >= 110) return Colors.yellow; // 1:50+
+  Color _getTimerColor(int seconds) {
+    if (seconds >= 118) return Colors.red; // 1:58+
+    if (seconds >= 110) return Colors.yellow; // 1:50+
     return Colors.white;
   }
 
@@ -71,13 +70,16 @@ class _VoiceRecordingOverlayState extends State<VoiceRecordingOverlay>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Timer display
-              Text(
-                _formatDuration(widget.recordingDuration),
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: _getTimerColor(),
+              // Timer display (ValueListenableBuilder: survives overlay rebuilds)
+              ValueListenableBuilder<int>(
+                valueListenable: widget.recordingSeconds,
+                builder: (context, seconds, _) => Text(
+                  _formatDuration(seconds),
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: _getTimerColor(seconds),
+                  ),
                 ),
               ),
               const SizedBox(height: 32),

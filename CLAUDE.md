@@ -493,7 +493,7 @@ Telegram-like voice messaging with hold-to-record, optimistic UI, Cloudinary sto
 ### UI Components
 
 - **VoiceRecordingOverlay** (new): Full-screen overlay with timer, pulsing animation, cancel gesture. Replaces mic button UI during recording.
-- **VoiceMessageBubble** (new): Dedicated widget for VOICE messages. Shows play/pause, waveform (CustomPainter pseudo-random bars), duration, speed toggle. Same bubble colors as text messages.
+- **VoiceMessageBubble** (new): Dedicated widget for VOICE messages. Shows play/pause, waveform (CustomPainter pseudo-random bars), duration, speed toggle. Uses message.mediaDuration for initial waveform/duration display before audio loads. Resets to play icon and seeks to start when playback completes. Shows disappearing timer (clock + remaining time) like text messages.
 - **ChatMessageBubble:** Routes VOICE messageType to VoiceMessageBubble. Shows retry button for FAILED messages.
 - **ChatInputBar:** Long-press mic (onLongPress) starts recording. Uses OverlayEntry to show VoiceRecordingOverlay.
 
@@ -548,6 +548,8 @@ Telegram-like voice messaging with hold-to-record, optimistic UI, Cloudinary sto
 ## 14. Recent Changes
 
 **2026-02-15:**
+
+- **Recording timer fix + voice code cleanup (2026-02-15):** Recording overlay timer was freezing/jumping because overlay was rebuilt frequently and its internal timer was disposed. Fix: move timer to parent (ChatInputBar) with ValueNotifier<int>; overlay uses ValueListenableBuilder to display. Parent updates notifier every second; overlay survives rebuilds. Duration computed from _recordingStartTime (no drift). Cleanup: removed dead onSendVoice from VoiceRecordingOverlay; voice_message_bubble uses showTopSnackBar (project convention); chat_message_bubble _buildRetryButton called once via Builder. Added import package:flutter/foundation.dart to voice_recording_overlay for ValueListenable. Files: chat_input_bar.dart, voice_recording_overlay.dart, voice_message_bubble.dart, chat_message_bubble.dart.
 
 - **Voice messages web fix (2026-02-15):** Fixed "Failed to start recording" and "Platform._operatingSystem" on Flutter web. Root cause: `dart:io` (Platform, File, getTemporaryDirectory) is unsupported on web. Changes: (1) Guard `Platform.isAndroid/isIOS` with `!kIsWeb` in _checkMicPermission. (2) On web, skip getTemporaryDirectory; use simple path for record. (3) On web, use Opus encoder (Chrome/Firefox); record returns blob URL, fetch bytes via http.get, pass to uploadVoiceMessage(audioBytes). (4) ApiService.uploadVoiceMessage accepts optional audioBytes (web) or audioPath (native). (5) ChatProvider.sendVoiceMessage accepts localAudioBytes or localAudioPath; only delete temp file when !kIsWeb. (6) Retry on web shows "Retry not available" (no cached bytes). Files: chat_input_bar.dart, api_service.dart, chat_provider.dart.
 
