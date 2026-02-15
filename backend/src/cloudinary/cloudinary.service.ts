@@ -12,6 +12,12 @@ export interface UploadImageResult {
   publicId: string;
 }
 
+export interface UploadVoiceResult {
+  secureUrl: string;
+  publicId: string;
+  duration: number;
+}
+
 @Injectable()
 export class CloudinaryService {
   constructor(private configService: ConfigService) {
@@ -64,5 +70,36 @@ export class CloudinaryService {
     } catch {
       // File might not exist, ignore
     }
+  }
+
+  async uploadVoiceMessage(
+    userId: number,
+    buffer: Buffer,
+    mimeType: string,
+    expiresIn?: number,
+  ): Promise<UploadVoiceResult> {
+    const dataUri = `data:${mimeType};base64,${buffer.toString('base64')}`;
+
+    const uploadOptions: any = {
+      folder: 'voice-messages',
+      public_id: `user-${userId}-${Date.now()}`,
+      resource_type: 'video', // Cloudinary uses 'video' for audio files
+      format: 'm4a',
+    };
+
+    // Set TTL if disappearing timer is active
+    if (expiresIn) {
+      // Add 1 hour buffer to allow for delivery/playback
+      const ttlSeconds = expiresIn + 3600;
+      uploadOptions.expires_at = Math.floor(Date.now() / 1000) + ttlSeconds;
+    }
+
+    const result = await cloudinary.uploader.upload(dataUri, uploadOptions);
+
+    return {
+      secureUrl: result.secure_url,
+      publicId: result.public_id,
+      duration: result.duration || 0,
+    };
   }
 }
