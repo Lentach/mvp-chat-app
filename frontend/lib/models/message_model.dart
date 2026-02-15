@@ -3,6 +3,7 @@ enum MessageDeliveryStatus {
   sent,
   delivered,
   read,
+  failed,
 }
 
 enum MessageType {
@@ -75,6 +76,8 @@ class MessageModel {
         return MessageDeliveryStatus.delivered;
       case 'READ':
         return MessageDeliveryStatus.read;
+      case 'FAILED':
+        return MessageDeliveryStatus.failed;
       default:
         return MessageDeliveryStatus.sent;
     }

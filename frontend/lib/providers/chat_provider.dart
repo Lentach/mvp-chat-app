@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -420,6 +421,99 @@ class ChatProvider extends ChangeNotifier {
 
   void sendPing(int recipientId) {
     _socketService.sendPing(recipientId);
+  }
+
+  Future<void> sendVoiceMessage({
+    required int recipientId,
+    required String localAudioPath,
+    required int duration,
+    int? conversationId,
+  }) async {
+    if (_currentUserId == null) return;
+
+    // Use provided conversationId or active one
+    final effectiveConvId = conversationId ?? _activeConversationId;
+    if (effectiveConvId == null) return;
+
+    // Generate unique tempId for optimistic message matching
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}_$_currentUserId';
+
+    // Get disappearing timer from conversation
+    final conv = _conversations.firstWhere((c) => c.id == effectiveConvId);
+    final effectiveExpiresIn = conv.disappearingTimer;
+
+    // 1. Create optimistic message
+    final optimisticMessage = MessageModel(
+      id: -DateTime.now().millisecondsSinceEpoch, // Temporary negative ID
+      content: '',
+      senderId: _currentUserId!,
+      senderEmail: '', // Will be replaced when server confirms
+      conversationId: effectiveConvId,
+      createdAt: DateTime.now(),
+      deliveryStatus: MessageDeliveryStatus.sending,
+      messageType: MessageType.voice,
+      mediaUrl: localAudioPath, // local file path initially
+      mediaDuration: duration,
+      tempId: tempId,
+      expiresAt: effectiveExpiresIn != null
+          ? DateTime.now().add(Duration(seconds: effectiveExpiresIn))
+          : null,
+    );
+
+    // 2. Add to messages immediately (optimistic)
+    _messages.add(optimisticMessage);
+    _lastMessages[effectiveConvId] = optimisticMessage;
+    notifyListeners();
+
+    // 3. Upload to backend in background
+    try {
+      final api = ApiService(baseUrl: AppConfig.baseUrl);
+      final result = await api.uploadVoiceMessage(
+        audioPath: localAudioPath,
+        duration: duration,
+        expiresIn: effectiveExpiresIn,
+      );
+
+      // 4. Send via WebSocket with Cloudinary URL
+      _socketService.sendMessage(
+        recipientId,
+        '', // empty content for voice
+        messageType: 'VOICE',
+        mediaUrl: result.mediaUrl,
+        mediaDuration: result.duration,
+        expiresIn: effectiveExpiresIn,
+        tempId: tempId,
+      );
+
+      // 5. Update local message with Cloudinary URL
+      final index = _messages.indexWhere((m) => m.tempId == tempId);
+      if (index != -1) {
+        _messages[index] = _messages[index].copyWith(
+          mediaUrl: result.mediaUrl,
+          mediaDuration: result.duration,
+          deliveryStatus: MessageDeliveryStatus.sent,
+        );
+        notifyListeners();
+      }
+
+      // 6. Delete temp file after successful upload
+      final file = File(localAudioPath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      // 7. Mark as failed, keep local file for retry
+      final index = _messages.indexWhere((m) => m.tempId == tempId);
+      if (index != -1) {
+        _messages[index] = _messages[index].copyWith(
+          deliveryStatus: MessageDeliveryStatus.failed,
+        );
+        notifyListeners();
+      }
+
+      _errorMessage = 'Failed to send voice message';
+      print('Voice upload error: $e');
+    }
   }
 
   Future<void> sendImageMessage(
