@@ -10,6 +10,7 @@ enum MessageType {
   ping,
   image,
   drawing,
+  voice,
 }
 
 class MessageModel {
@@ -84,6 +85,8 @@ class MessageModel {
         return MessageType.image;
       case 'DRAWING':
         return MessageType.drawing;
+      case 'VOICE':
+        return MessageType.voice;
       default:
         return MessageType.text;
     }
