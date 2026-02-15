@@ -25,6 +25,7 @@ class MessageModel {
   final DateTime? expiresAt;
   final MessageType messageType;
   final String? mediaUrl;
+  final int? mediaDuration;
   final String? tempId; // For optimistic message matching
 
   MessageModel({
@@ -39,6 +40,7 @@ class MessageModel {
     this.expiresAt,
     this.messageType = MessageType.text,
     this.mediaUrl,
+    this.mediaDuration,
     this.tempId,
   });
 
@@ -57,6 +59,7 @@ class MessageModel {
           : null,
       messageType: _parseMessageType(json['messageType'] as String?),
       mediaUrl: json['mediaUrl'] as String?,
+      mediaDuration: json['mediaDuration'] as int?,
       tempId: json['tempId'] as String?,
     );
   }
@@ -95,6 +98,8 @@ class MessageModel {
   MessageModel copyWith({
     MessageDeliveryStatus? deliveryStatus,
     DateTime? expiresAt,
+    String? mediaUrl,
+    int? mediaDuration,
   }) {
     return MessageModel(
       id: id,
@@ -107,7 +112,8 @@ class MessageModel {
       deliveryStatus: deliveryStatus ?? this.deliveryStatus,
       expiresAt: expiresAt ?? this.expiresAt,
       messageType: messageType,
-      mediaUrl: mediaUrl,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
+      mediaDuration: mediaDuration ?? this.mediaDuration,
       tempId: tempId,
     );
   }
