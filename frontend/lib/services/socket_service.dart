@@ -87,6 +87,9 @@ class SocketService {
   void sendMessage(
     int recipientId,
     String content, {
+    String? messageType,
+    String? mediaUrl,
+    int? mediaDuration,
     int? expiresIn,
     String? tempId,
   }) {
@@ -94,6 +97,15 @@ class SocketService {
       'recipientId': recipientId,
       'content': content,
     };
+    if (messageType != null) {
+      payload['messageType'] = messageType;
+    }
+    if (mediaUrl != null) {
+      payload['mediaUrl'] = mediaUrl;
+    }
+    if (mediaDuration != null) {
+      payload['mediaDuration'] = mediaDuration;
+    }
     if (expiresIn != null) {
       payload['expiresIn'] = expiresIn;
     }
