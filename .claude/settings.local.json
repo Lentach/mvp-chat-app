@@ -89,7 +89,23 @@
       "Bash(claude plugin:*)",
       "Bash(start:*)",
       "Bash(ls:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(timeout 15 cmd:*)",
+      "Bash(timeout 120 cmd:*)",
+      "Bash(timeout:*)",
+      "Bash(flutter devices:*)",
+      "Bash(\"C:/Users/Lentach/desktop/mvp-chat-app/backend/src/chat/dto/set-disappearing-timer.dto.ts\" << 'EOF'\nimport { IsNumber, IsOptional } from 'class-validator';\n\nexport class SetDisappearingTimerDto {\n  @IsNumber\\(\\)\n  conversationId: number;\n\n  @IsOptional\\(\\)\n  @IsNumber\\(\\)\n  seconds: number | null;\n}\nEOF)",
+      "Bash(npm run test:*)",
+      "Bash(python3:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git worktree:*)",
+      "Bash(npm test:*)",
+      "Bash(git log:*)",
+      "Bash(grep:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)"
     ]
   }
 }

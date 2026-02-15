@@ -20,7 +20,22 @@ async function bootstrap() {
   )
     .split(',')
     .map((o) => o.trim());
-  app.enableCors({ origin: allowedOrigins });
+
+  // In development, allow all localhost origins (Flutter dev server uses random ports)
+  const corsOrigin =
+    process.env.NODE_ENV === 'production'
+      ? allowedOrigins
+      : (origin, callback) => {
+          if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+            callback(null, true);
+          } else if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        };
+
+  app.enableCors({ origin: corsOrigin, credentials: true });
 
   const port = configService.get('PORT') || 3000;
   await app.listen(port, '0.0.0.0');

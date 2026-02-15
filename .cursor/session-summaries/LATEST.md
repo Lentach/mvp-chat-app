@@ -1,8 +1,8 @@
 # Ostatnia sesja (najnowsze podsumowanie)
 
-**Data:** 2026-02-01  
-**Pełne podsumowanie:** [2026-02-01-conversations-ui-redesign.md](2026-02-01-conversations-ui-redesign.md)
+**Data:** 2026-02-13  
+**Pełne podsumowanie:** [2026-02-13-mobile-http-debugging.md](2026-02-13-mobile-http-debugging.md)
 
 ## Skrót
-- **Conversations UI redesign:** MainShell z dolną nawigacją (Conversations, Archive, Settings). ConversationsScreen: custom header (avatar+tarcza, "Conversations", plus z badge); plus → AddOrInvitationsScreen (zakładki Add by email, Friend requests). Lista rozmów z Dividerem. ArchivePlaceholderScreen "Coming soon". Wylogowanie tylko z zakładki Settings.
-- **Wcześniej:** Code review/shipping, CLAUDE.md, Delete Account Cascade, Avatar fix, Dark Mode.
+- **Mobile HTTP debugging (REVERTED):** Próba naprawy ładowania wiadomości na mobile. Odkryto że Android nie może tworzyć nowych połączeń TCP kiedy WebSocket jest aktywny. Wszystkie zmiany (~641 linii) cofnięte. Czysty stan z ostatniego commita.
+- **Rekomendacja:** Użyć WebSocket chunking bezpośrednio (bez HTTP) — wiadomości ładują się w ~2s przez WS chunki.
