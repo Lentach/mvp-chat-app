@@ -207,13 +207,20 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
 
                 const SizedBox(width: 8),
 
-                // Waveform placeholder (will add in next task)
+                // Waveform with progress
                 Expanded(
-                  child: Container(
-                    height: 40,
-                    color: Colors.grey.withOpacity(0.2),
-                    child: const Center(child: Text('Waveform')),
-                  ),
+                  child: _duration.inMilliseconds > 0
+                      ? CustomPaint(
+                          painter: _WaveformPainter(
+                            progress: _position.inMilliseconds / _duration.inMilliseconds,
+                            color: borderColor,
+                          ),
+                          size: const Size(double.infinity, 40),
+                        )
+                      : Container(
+                          height: 40,
+                          color: Colors.grey.withOpacity(0.1),
+                        ),
                 ),
 
                 const SizedBox(width: 8),
@@ -268,5 +275,52 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         ),
       ),
     );
+  }
+}
+
+class _WaveformPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  _WaveformPainter({
+    required this.progress,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withOpacity(0.3)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    final paintFilled = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    // Generate random-looking waveform (in real impl, use actual audio data)
+    final barCount = 50;
+    final barWidth = size.width / barCount;
+
+    for (int i = 0; i < barCount; i++) {
+      // Pseudo-random height based on index (deterministic for same message)
+      final heightFactor = ((i * 7) % 10) / 10.0;
+      final barHeight = size.height * 0.2 + (size.height * 0.6 * heightFactor);
+
+      final x = i * barWidth + barWidth / 2;
+      final y1 = (size.height - barHeight) / 2;
+      final y2 = y1 + barHeight;
+
+      // Use filled paint if before progress, else unfilled
+      final currentPaint = (i / barCount) <= progress ? paintFilled : paint;
+
+      canvas.drawLine(Offset(x, y1), Offset(x, y2), currentPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WaveformPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
