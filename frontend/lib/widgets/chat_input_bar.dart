@@ -40,6 +40,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   // Slide-to-cancel state
   double _cancelDragOffset = 0.0;
+  double _dragStartX = 0.0; // track start position for delta calculation
   bool _showTrashIcon = false;
 
   // Pulsing red dot animation
@@ -120,8 +121,11 @@ class _ChatInputBarState extends State<ChatInputBar>
 
 
   Future<void> _startRecording() async {
+    print('[VOICE] _startRecording called');
     try {
+      print('[VOICE] Checking mic permission');
       await _checkMicPermission();
+      print('[VOICE] Mic permission OK');
 
       _audioRecorder = AudioRecorder();
       if (kIsWeb) {
@@ -171,7 +175,11 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Future<void> _stopRecording() async {
-    if (_audioRecorder == null || !_isRecording) return;
+    print('[VOICE] _stopRecording called, _isRecording=$_isRecording, _audioRecorder=${_audioRecorder != null}');
+    if (_audioRecorder == null || !_isRecording) {
+      print('[VOICE] Early return: audioRecorder null or not recording');
+      return;
+    }
 
     _recordingTimer?.cancel();
     _recordingTimer = null;
@@ -179,6 +187,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _recordingSecondsNotifier = null;
 
     final path = await _audioRecorder!.stop();
+    print('[VOICE] Recording stopped, path=$path');
     await _audioRecorder!.dispose();
     _audioRecorder = null;
 
@@ -192,10 +201,12 @@ class _ChatInputBarState extends State<ChatInputBar>
     final durationSeconds = _recordingStartTime != null
         ? DateTime.now().difference(_recordingStartTime!).inSeconds
         : 0;
+    print('[VOICE] Duration: $durationSeconds seconds');
     _recordingStartTime = null;
 
     // Check duration
     if (durationSeconds < 1) {
+      print('[VOICE] Duration too short (<1s), not sending');
       if (!kIsWeb && path != null) {
         try {
           final file = File(path);
@@ -212,26 +223,39 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     // Send voice message
     if (path != null) {
+      print('[VOICE] Sending voice message, path=$path, kIsWeb=$kIsWeb');
       if (kIsWeb) {
         // Web: path is blob URL, fetch bytes
         try {
+          print('[VOICE] Fetching blob from $path');
           final response = await http.get(Uri.parse(path));
+          print('[VOICE] Blob fetch response: ${response.statusCode}');
           if (response.statusCode == 200) {
+            print('[VOICE] Calling _sendVoiceMessage with ${response.bodyBytes.length} bytes');
             await _sendVoiceMessage(duration: durationSeconds, audioBytes: response.bodyBytes);
+            print('[VOICE] Voice message sent successfully');
           } else {
             if (!mounted) return;
             showTopSnackBar(context, 'Failed to read recording');
+            print('[VOICE] ERROR: Failed to read recording, status=${response.statusCode}');
           }
         } catch (e) {
           if (!mounted) return;
           showTopSnackBar(context, 'Failed to send voice message');
+          print('[VOICE] ERROR: Exception sending voice message: $e');
         }
       } else {
         final file = File(path);
         if (await file.exists()) {
+          print('[VOICE] File exists, sending from path');
           await _sendVoiceMessage(duration: durationSeconds, localAudioPath: path);
+          print('[VOICE] Voice message sent successfully');
+        } else {
+          print('[VOICE] ERROR: File does not exist at $path');
         }
       }
+    } else {
+      print('[VOICE] ERROR: path is null, cannot send');
     }
 
     setState(() {
@@ -315,21 +339,32 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
   }
 
-  void _onRecordingDragUpdate(double offsetX) {
+  void _onRecordingDragStart(double startX) {
+    _dragStartX = startX;
+    _cancelDragOffset = 0.0;
+    print('[VOICE] Drag start at x=$startX');
+  }
+
+  void _onRecordingDragUpdate(double currentX) {
     if (!_isRecording) return;
 
     setState(() {
-      _cancelDragOffset = offsetX;
+      // Calculate offset from start position (negative = left, positive = right)
+      _cancelDragOffset = currentX - _dragStartX;
+
+      print('[VOICE] Drag update: currentX=$currentX, startX=$_dragStartX, offset=$_cancelDragOffset');
 
       // Show trash icon when user starts sliding left
       if (_cancelDragOffset < -20) {
         _showTrashIcon = true;
+        print('[VOICE] Trash icon shown');
       } else {
         _showTrashIcon = false;
       }
 
       // Cancel threshold: -150px
       if (_cancelDragOffset < -150) {
+        print('[VOICE] Cancel threshold reached!');
         _cancelRecording();
       }
     });
@@ -563,9 +598,15 @@ class _ChatInputBarState extends State<ChatInputBar>
                               onPressed: _send,
                             )
                           : GestureDetector(
-                              onLongPressStart: (_) => _startRecording(),
-                              onLongPressMoveUpdate: (details) => _onRecordingDragUpdate(details.localOffsetFromOrigin.dx),
-                              onLongPressEnd: (_) => _stopRecording(),
+                              onLongPressStart: (details) {
+                                _onRecordingDragStart(details.localPosition.dx);
+                                _startRecording();
+                              },
+                              onLongPressMoveUpdate: (details) => _onRecordingDragUpdate(details.localPosition.dx),
+                              onLongPressEnd: (_) {
+                                print('[VOICE] Long press ended, calling _stopRecording()');
+                                _stopRecording();
+                              },
                               child: IconButton(
                                 icon: Icon(
                                   _isRecording ? Icons.mic : Icons.mic_none,
