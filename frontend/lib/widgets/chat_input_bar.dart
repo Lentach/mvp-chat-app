@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:typed_data';
 import 'package:record/record.dart';
@@ -344,22 +345,27 @@ class _ChatInputBarState extends State<ChatInputBar>
   String _formatRecordingDuration(int seconds) {
     final minutes = seconds ~/ 60;
     final secs = seconds % 60;
-    return '${minutes}:${secs.toString().padLeft(2, '0')}';
+    return '$minutes:${secs.toString().padLeft(2, '0')}';
   }
 
   Widget _buildRecordingBar(BuildContext context) {
     final isDark = RpgTheme.isDark(context);
     final tabBorderColor = isDark ? RpgTheme.tabBorderDark : RpgTheme.tabBorderLight;
     final inputBg = isDark ? RpgTheme.inputBg : RpgTheme.inputBgLight;
+    final currentSeconds = _recordingSecondsNotifier?.value ?? 0;
 
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: tabBorderColor),
-        color: inputBg,
-      ),
+    return Semantics(
+      label: 'Recording voice message, ${_formatRecordingDuration(currentSeconds)}. Swipe left to cancel.',
+      child: Transform.translate(
+        offset: Offset(_cancelDragOffset.clamp(-150, 0), 0),
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: tabBorderColor),
+            color: inputBg,
+          ),
       child: Row(
         children: [
           // Trash icon (left side, visible when dragging left)
@@ -410,7 +416,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             child: Opacity(
               opacity: _showTrashIcon ? 0.0 : 1.0,
               child: Text(
-                '< Slide to cancel',
+                '⬅ Slide to cancel',
                 style: RpgTheme.bodyFont(
                   fontSize: 14,
                   color: isDark ? Colors.white60 : Colors.black54,
@@ -419,6 +425,8 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ),
         ],
+        ),
+      ),
       ),
     );
   }
