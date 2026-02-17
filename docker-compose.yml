@@ -25,7 +25,8 @@ services:
       DB_PASS: postgres
       DB_NAME: chatdb
       JWT_SECRET: my-super-secret-jwt-key-change-in-production
-      ALLOWED_ORIGINS: 'http://localhost:3000,http://192.168.1.11:3000,http://192.168.1.11:8080'
+      # Include your machine IP so phone browser can call API (e.g. 192.168.1.11)
+      ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:8080,http://127.0.0.1:8081,http://192.168.1.11:3000,http://192.168.1.11:8080,http://192.168.1.11:8081'
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
