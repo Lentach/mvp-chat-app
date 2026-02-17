@@ -38,8 +38,11 @@ class _ChatInputBarState extends State<ChatInputBar>
   DateTime? _recordingStartTime;
   ValueNotifier<int>? _recordingSecondsNotifier; // tick-based timer for recording duration display
 
-  // Slide-to-cancel state (Telegram-style: slide LEFT to cancel)
-  static const double _cancelThresholdPx = 100.0; // screen pixels left to cancel
+  // Slide-to-cancel: drag mic TO trash to cancel (release over trash zone)
+  static const double _trashOpenThresholdPx = 60.0;  // trash "opens" (scales) when mic this close
+
+  double _getCancelThreshold(BuildContext context) =>
+      MediaQuery.of(context).size.width * 0.5; // mic travels half the screen to reach trash
   double _cancelDragOffset = 0.0;
   double _dragStartX = 0.0; // global X when drag started
   bool _showTrashIcon = false;
@@ -333,19 +336,18 @@ class _ChatInputBarState extends State<ChatInputBar>
       // Delta in screen pixels (negative = slid left)
       _cancelDragOffset = currentX - _dragStartX;
 
-      // Show trash when sliding left
+      // Show trash when sliding left (user sees drop target)
       if (_cancelDragOffset < -20) {
         _showTrashIcon = true;
       } else {
         _showTrashIcon = false;
       }
-
-      // Cancel when slid left past threshold (Telegram-style)
-      if (_cancelDragOffset < -_cancelThresholdPx) {
-        _cancelRecording();
-      }
+      // Do NOT cancel during drag – cancel only on release when mic is over trash
     });
   }
+
+  bool _isOverTrash(BuildContext context) =>
+      _cancelDragOffset < -_getCancelThreshold(context);
 
   String _formatTimer(int seconds) {
     if (seconds >= 86400) return '${seconds ~/ 86400}d';
@@ -368,9 +370,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     return Semantics(
       label: 'Recording voice message, ${_formatRecordingDuration(currentSeconds)}. Swipe left to cancel.',
-      child: Transform.translate(
-        offset: Offset(_cancelDragOffset.clamp(-_cancelThresholdPx, 0), 0),
-        child: Container(
+      child: Container(
           height: 48,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
@@ -380,14 +380,19 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
       child: Row(
         children: [
-          // Trash icon (left side, visible when dragging left)
+          // Trash icon: always visible when dragging left; "opens" (scales) when mic gets close
           if (_showTrashIcon)
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Icon(
-                Icons.delete_outline,
-                color: Colors.red,
-                size: 24,
+              child: AnimatedScale(
+                scale: _cancelDragOffset < -_trashOpenThresholdPx ? 1.25 : 1.0,
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.easeOut,
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Colors.red,
+                  size: 24,
+                ),
               ),
             ),
 
@@ -408,18 +413,27 @@ class _ChatInputBarState extends State<ChatInputBar>
 
           const SizedBox(width: 12),
 
-          // Timer
-          ValueListenableBuilder<int>(
-            valueListenable: _recordingSecondsNotifier!,
-            builder: (context, seconds, _) => Text(
-              _formatRecordingDuration(seconds),
-              style: RpgTheme.bodyFont(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-          ),
+          // Timer (guard: notifier can be null briefly on stop/cancel before setState)
+          _recordingSecondsNotifier != null
+              ? ValueListenableBuilder<int>(
+                  valueListenable: _recordingSecondsNotifier!,
+                  builder: (context, seconds, _) => Text(
+                    _formatRecordingDuration(seconds),
+                    style: RpgTheme.bodyFont(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                )
+              : Text(
+                  _formatRecordingDuration(0),
+                  style: RpgTheme.bodyFont(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
 
           const SizedBox(width: 16),
 
@@ -437,7 +451,6 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ),
         ],
-        ),
       ),
       ),
     );
@@ -574,7 +587,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                   )
                 else
                   Transform.translate(
-                    offset: Offset(_isRecording ? _cancelDragOffset.clamp(-_cancelThresholdPx, 0) : 0, 0),
+                    offset: Offset(
+                      _isRecording
+                          ? _cancelDragOffset.clamp(-_getCancelThreshold(context), 0)
+                          : 0,
+                      0,
+                    ),
                     child: GestureDetector(
                       onLongPressStart: (details) {
                         _onRecordingDragStart(details.globalPosition.dx);
@@ -582,20 +600,37 @@ class _ChatInputBarState extends State<ChatInputBar>
                       },
                       onLongPressMoveUpdate: (details) => _onRecordingDragUpdate(details.globalPosition.dx),
                       onLongPressEnd: (_) {
-                        if (_isRecording && !_canceledBySlide) _stopRecording();
+                        if (_isRecording && !_canceledBySlide) {
+                          if (_isOverTrash(context)) {
+                            _cancelRecording();
+                          } else {
+                            _stopRecording();
+                          }
+                        }
                       },
                       onLongPressCancel: () {
-                        if (_isRecording && !_canceledBySlide) _stopRecording();
+                        if (_isRecording && !_canceledBySlide) {
+                          if (_isOverTrash(context)) {
+                            _cancelRecording();
+                          } else {
+                            _stopRecording();
+                          }
+                        }
                       },
-                      child: IconButton(
-                        icon: Icon(
-                          _isRecording ? Icons.mic : Icons.mic_none,
-                          size: 22,
+                      child: AnimatedScale(
+                        scale: _isRecording ? 1.15 : 1.0,
+                        duration: const Duration(milliseconds: 150),
+                        curve: Curves.easeOut,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            _isRecording ? Icons.mic : Icons.mic_none,
+                            size: 22,
+                            color: _isRecording
+                                ? Colors.red
+                                : (isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight),
+                          ),
                         ),
-                        color: _isRecording
-                            ? Colors.red
-                            : (isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight),
-                        onPressed: null, // Disabled, use long-press
                       ),
                     ),
                   ),

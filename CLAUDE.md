@@ -532,12 +532,13 @@ const active = messages.filter(
 
 **Recording flow in ChatInputBar:**
 1. Long-press mic -> recording starts via `record` package
-2. Timer shown via `ValueNotifier<int>` (prevents rebuild freeze)
-3. **Release** -> `_stopRecording()` -> upload + send
-4. **Slide left ~100px** -> cancel (`_canceledBySlide` flag), trash icon shows
-5. `onLongPressCancel` -> still calls `_stopRecording()` unless canceled by slide
-6. **Mic stays visible** during recording (GestureDetector must stay in tree for events)
-7. `Transform.translate` moves mic icon with finger drag (global position tracking)
+2. **Mic on press:** turns red + scales up (1.15x, AnimatedScale)
+3. Timer shown via `ValueNotifier<int>` (prevents rebuild freeze)
+4. **Drag to trash:** User must drag mic icon to trash to cancel; trash "opens" (scales 1.25x) when mic gets close (60px); cancel only on release when mic is over trash zone (50% of screen width)
+5. **Release outside trash** -> `_stopRecording()` -> upload + send
+6. **Release over trash** -> `_cancelRecording()`; trash zone = `_cancelDragOffset < -screenWidth*0.5`
+7. **Mic stays visible** during recording; only mic slides (recording bar with red dot, timer stays fixed)
+8. `Transform.translate` moves mic icon with finger drag (global position tracking)
 
 **Upload flow:**
 1. Create optimistic message (SENDING status, negative temp ID)
@@ -720,6 +721,7 @@ Frontend runs locally (not in Docker): `flutter run -d chrome`
 ## 13. Recent Changes (Last 14 Days)
 
 **2026-02-17:**
+- **Voice recording drag-to-trash:** User must drag mic to trash to cancel; trash scales up (1.25x) when mic gets close; cancel only on release when mic is over trash zone. Max drag = 50% of screen width.
 - **Voice message compact UI:** Scrubbable waveform (Telegram-style) — tap or drag on waveform to seek; removed separate slider row. Time display integrated into one row.
 - **Quick clean refactoring:** Removed dead code, debug prints, unused exports. Net -454 lines.
   - Deleted 3 dead screens: `archive_placeholder_screen.dart`, `friend_requests_screen.dart`, `new_chat_screen.dart`
