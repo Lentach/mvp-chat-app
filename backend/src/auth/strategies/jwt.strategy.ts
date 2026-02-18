@@ -26,7 +26,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // Returns the user object which will be available in request.user.
   async validate(payload: {
     sub: number;
-    email: string;
     username: string;
     profilePictureUrl: string;
   }) {
@@ -36,7 +35,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     return {
       id: user.id,
-      email: user.email,
       username: user.username,
       profilePictureUrl: user.profilePictureUrl,
     };

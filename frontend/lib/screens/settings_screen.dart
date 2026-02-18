@@ -215,7 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Stack(
                   children: [
                     AvatarCircle(
-                      email: auth.currentUser?.email ?? '',
+                      displayName: auth.currentUser?.username ?? '',
                       radius: 60,
                       profilePictureUrl: auth.currentUser?.profilePictureUrl,
                     ),
@@ -252,14 +252,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     fontSize: 20,
                     color: theme.colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  auth.currentUser?.email ?? '',
-                  style: RpgTheme.bodyFont(
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 32),

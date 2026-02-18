@@ -150,7 +150,7 @@ export class ChatFriendRequestService {
 
     // Step 1: Find users (CRITICAL - if either user not found, fail)
     const sender = await this.usersService.findById(senderId);
-    const recipient = await this.usersService.findByEmail(data.recipientEmail);
+    const recipient = await this.usersService.findByUsername(data.recipientUsername);
 
     if (!sender || !recipient) {
       client.emit('error', { message: 'User not found' });
@@ -162,7 +162,7 @@ export class ChatFriendRequestService {
     let payload: any;
     try {
       this.logger.debug(
-        `sendFriendRequest: sender=${sender.email} (id=${sender.id}), recipient=${recipient.email} (id=${recipient.id})`,
+        `sendFriendRequest: sender=${sender.username} (id=${sender.id}), recipient=${recipient.username} (id=${recipient.id})`,
       );
       friendRequest = await this.friendsService.sendRequest(sender, recipient);
       this.logger.debug(
@@ -180,14 +180,14 @@ export class ChatFriendRequestService {
 
     // Check if it was auto-accepted (mutual request scenario)
     if (friendRequest.status === 'accepted') {
-      this.logger.debug(`Auto-accept: ${sender.email} <-> ${recipient.email}`);
+      this.logger.debug(`Auto-accept: ${sender.username} <-> ${recipient.username}`);
       await this.emitAutoAcceptFlow(client, server, sender, recipient, payload, onlineUsers);
     } else {
       // Normal pending request flow
       // Step 4a: Notify sender (important but not critical)
       try {
         this.logger.debug(
-          `sendFriendRequest: emitting friendRequestSent to sender ${sender.email}`,
+          `sendFriendRequest: emitting friendRequestSent to sender ${sender.username}`,
         );
         client.emit('friendRequestSent', payload);
       } catch (error) {
@@ -201,7 +201,7 @@ export class ChatFriendRequestService {
       try {
         const recipientSocketId = onlineUsers.get(recipient.id);
         this.logger.debug(
-          `sendFriendRequest: recipient ${recipient.email} (id=${recipient.id}) socketId=${recipientSocketId || 'OFFLINE'}`,
+          `sendFriendRequest: recipient ${recipient.username} (id=${recipient.id}) socketId=${recipientSocketId || 'OFFLINE'}`,
         );
         if (recipientSocketId) {
           server.to(recipientSocketId).emit('newFriendRequest', payload);
@@ -251,7 +251,7 @@ export class ChatFriendRequestService {
         userId,
       );
       this.logger.debug(
-        `acceptFriendRequest: accepted, sender=${friendRequest.sender.id} (${friendRequest.sender.email}), receiver=${friendRequest.receiver.id} (${friendRequest.receiver.email})`,
+        `acceptFriendRequest: accepted, sender=${friendRequest.sender.id} (${friendRequest.sender.username}), receiver=${friendRequest.receiver.id} (${friendRequest.receiver.username})`,
       );
 
       const payload = FriendRequestMapper.toPayload(friendRequest);

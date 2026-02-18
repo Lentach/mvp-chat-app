@@ -32,17 +32,16 @@ class AuthProvider extends ChangeNotifier {
       final payload = JwtDecoder.decode(savedToken);
       _currentUser = UserModel(
         id: payload['sub'] as int,
-        email: payload['email'] as String,
-        username: payload['username'] as String?,
+        username: payload['username'] as String,
         profilePictureUrl: payload['profilePictureUrl'] as String?,
       );
       notifyListeners();
     }
   }
 
-  Future<bool> register(String email, String password, String? username) async {
+  Future<bool> register(String username, String password) async {
     try {
-      await _api.register(email, password, username);
+      await _api.register(username, password);
       _statusMessage = 'Hero created! Now login.';
       _isError = false;
       notifyListeners();
@@ -55,16 +54,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String username, String password) async {
     try {
-      final accessToken = await _api.login(email, password);
+      final accessToken = await _api.login(username, password);
       _token = accessToken;
 
       final payload = JwtDecoder.decode(accessToken);
       _currentUser = UserModel(
         id: payload['sub'] as int,
-        email: payload['email'] as String,
-        username: payload['username'] as String?,
+        username: payload['username'] as String,
         profilePictureUrl: payload['profilePictureUrl'] as String?,
       );
 

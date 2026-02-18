@@ -118,7 +118,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               child: GestureDetector(
                 onTap: widget.onAvatarTap,
                 child: AvatarCircle(
-                  email: user?.email ?? '',
+                  displayName: user?.username ?? '',
                   radius: 22,
                   profilePictureUrl: user?.profilePictureUrl,
                 ),

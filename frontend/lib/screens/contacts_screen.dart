@@ -9,7 +9,7 @@ import 'chat_detail_screen.dart';
 class ContactsScreen extends StatelessWidget {
   const ContactsScreen({super.key});
 
-  void _openChatWithContact(BuildContext context, int userId, String email) {
+  void _openChatWithContact(BuildContext context, int userId, String username) {
     final chat = context.read<ChatProvider>();
 
     // Check if conversation exists for this user
@@ -32,7 +32,7 @@ class ContactsScreen extends StatelessWidget {
       }
     } else {
       // No conversation, start new one (backend will create)
-      chat.socket.startConversation(email);
+      chat.socket.startConversation(username);
       // consumePendingOpen will handle navigation when backend responds
     }
   }
@@ -186,19 +186,15 @@ class ContactsScreen extends StatelessWidget {
   }
 
   Widget _buildContactTile(BuildContext context, dynamic friend) {
-    final isDark = RpgTheme.isDark(context);
     final colorScheme = Theme.of(context).colorScheme;
-    final secondaryColor =
-        isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
 
-    final username = friend.username ?? friend.email;
-    final email = friend.email as String;
+    final username = friend.username as String;
 
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        onTap: () => _openChatWithContact(context, friend.id, email),
+        onTap: () => _openChatWithContact(context, friend.id, username),
         onLongPress: () => _unfriendContact(context, friend.id, username),
         borderRadius: BorderRadius.circular(8),
         splashColor: RpgTheme.primaryColor(context).withValues(alpha: 0.2),
@@ -207,35 +203,20 @@ class ContactsScreen extends StatelessWidget {
           child: Row(
             children: [
               AvatarCircle(
-                email: email,
+                displayName: username,
                 profilePictureUrl: friend.profilePictureUrl,
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      username,
-                      style: RpgTheme.bodyFont(
-                        fontSize: 14,
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      email,
-                      style: RpgTheme.bodyFont(
-                        fontSize: 13,
-                        color: secondaryColor,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                child: Text(
+                  username,
+                  style: RpgTheme.bodyFont(
+                    fontSize: 14,
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

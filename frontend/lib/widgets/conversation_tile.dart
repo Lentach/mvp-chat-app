@@ -118,7 +118,7 @@ class ConversationTile extends StatelessWidget {
           child: Row(
             children: [
               AvatarCircle(
-                email: displayName,
+                displayName: displayName,
                 profilePictureUrl: otherUser?.profilePictureUrl,
               ),
               const SizedBox(width: 12),

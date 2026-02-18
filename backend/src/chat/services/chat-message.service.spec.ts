@@ -17,8 +17,8 @@ describe('ChatMessageService', () => {
   let friendsService: jest.Mocked<FriendsService>;
   let usersService: jest.Mocked<UsersService>;
 
-  const mockSender: Partial<User> = { id: 1, email: 'a@x.com', username: 'alice' };
-  const mockRecipient: Partial<User> = { id: 2, email: 'b@x.com', username: 'bob' };
+  const mockSender: Partial<User> = { id: 1, username: 'alice' };
+  const mockRecipient: Partial<User> = { id: 2, username: 'bob' };
   const mockConversation: Partial<Conversation> = { id: 10 };
   const mockMessage = {
     id: 100,

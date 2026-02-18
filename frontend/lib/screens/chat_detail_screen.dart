@@ -293,7 +293,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             child: Row(
               children: [
                 AvatarCircle(
-                  email: contactName,
+                  displayName: contactName,
                   radius: 18,
                   profilePictureUrl: otherUser?.profilePictureUrl,
                 ),
@@ -360,7 +360,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: AvatarCircle(
-              email: contactName,
+              displayName: contactName,
               radius: 18,
               profilePictureUrl: otherUser?.profilePictureUrl,
             ),

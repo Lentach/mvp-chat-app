@@ -11,14 +11,10 @@ class ApiService {
   ApiService({required this.baseUrl});
 
   Future<Map<String, dynamic>> register(
-    String email,
+    String username,
     String password,
-    String? username,
   ) async {
-    final body = {'email': email, 'password': password};
-    if (username != null && username.isNotEmpty) {
-      body['username'] = username;
-    }
+    final body = {'username': username, 'password': password};
 
     final response = await http.post(
       Uri.parse('$baseUrl/auth/register'),
@@ -33,11 +29,11 @@ class ApiService {
     return data;
   }
 
-  Future<String> login(String email, String password) async {
+  Future<String> login(String username, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      body: jsonEncode({'username': username, 'password': password}),
     );
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;

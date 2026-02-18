@@ -372,7 +372,7 @@ class ChatProvider extends ChangeNotifier {
       id: -DateTime.now().millisecondsSinceEpoch, // Temporary negative ID
       content: content,
       senderId: _currentUserId!,
-      senderEmail: '', // Will be replaced when server confirms
+      senderUsername: '', // Will be replaced when server confirms
       conversationId: _activeConversationId!,
       createdAt: DateTime.now(),
       deliveryStatus: MessageDeliveryStatus.sending,
@@ -425,7 +425,7 @@ class ChatProvider extends ChangeNotifier {
       id: -DateTime.now().millisecondsSinceEpoch, // Temporary negative ID
       content: '',
       senderId: _currentUserId!,
-      senderEmail: '', // Will be replaced when server confirms
+      senderUsername: '', // Will be replaced when server confirms
       conversationId: effectiveConvId,
       createdAt: DateTime.now(),
       deliveryStatus: MessageDeliveryStatus.sending,
@@ -702,16 +702,16 @@ class ChatProvider extends ChangeNotifier {
 
   // ---------- Conversation & friend actions (socket) ----------
 
-  void startConversation(String recipientEmail) {
-    _socketService.startConversation(recipientEmail);
+  void startConversation(String recipientUsername) {
+    _socketService.startConversation(recipientUsername);
   }
 
   void deleteConversationOnly(int conversationId) {
     _socketService.emitDeleteConversationOnly(conversationId);
   }
 
-  void sendFriendRequest(String recipientEmail) {
-    _socketService.sendFriendRequest(recipientEmail);
+  void sendFriendRequest(String recipientUsername) {
+    _socketService.sendFriendRequest(recipientUsername);
   }
 
   void acceptFriendRequest(int requestId) {

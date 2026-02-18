@@ -35,32 +35,30 @@ export class AuthService {
     }
   }
 
-  async register(email: string, password: string, username?: string) {
+  async register(username: string, password: string) {
     this.validatePassword(password);
-    const user = await this.usersService.create(email, password, username);
-    // Don't return the password in the response
-    return { id: user.id, email: user.email, username: user.username };
+    const user = await this.usersService.create(username, password);
+    return { id: user.id, username: user.username };
   }
 
-  async login(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+  async login(username: string, password: string) {
+    const user = await this.usersService.findByUsername(username);
     if (!user) {
-      this.auditLogger.log(`login failed email=${email}`);
+      this.auditLogger.log(`login failed username=${username}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const passwordValid = await bcrypt.compare(password, user.password);
     if (!passwordValid) {
-      this.auditLogger.log(`login failed email=${email}`);
+      this.auditLogger.log(`login failed username=${username}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    this.auditLogger.log(`login success userId=${user.id} email=${email}`);
+    this.auditLogger.log(`login success userId=${user.id} username=${username}`);
 
     // Token payload — sub is the JWT standard for "subject" (user id)
     const payload = {
       sub: user.id,
-      email: user.email,
       username: user.username,
       profilePictureUrl: user.profilePictureUrl,
     };

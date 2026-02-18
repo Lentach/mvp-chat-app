@@ -78,8 +78,7 @@ erDiagram
 
     users {
         int id PK
-        string email UK
-        string username UK "nullable, case-insensitive"
+        string username UK "required, case-insensitive"
         string password "bcrypt hash, 10 rounds"
         string profilePictureUrl "nullable"
         string profilePicturePublicId "nullable, Cloudinary"
@@ -126,7 +125,7 @@ erDiagram
 ## 3. WebSocket API -- Complete Event Reference
 
 **Connection:** `io(baseUrl, { auth: { token: JWT } })` — token in auth only (not query) to avoid URL/log leakage.
-Gateway verifies JWT, stores `client.data.user = { id, email, username }`, tracks `onlineUsers: Map<userId, socketId>`.
+Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onlineUsers: Map<userId, socketId>`.
 
 ### 3.1 Message Events
 
@@ -163,7 +162,7 @@ Gateway verifies JWT, stores `client.data.user = { id, email, username }`, track
 
 **Message payload** (`messageSent` / `newMessage` / `pingSent` / `newPing`):
 ```typescript
-{ id, content, senderId, senderEmail, senderUsername, conversationId,
+{ id, content, senderId, senderUsername, conversationId,
   createdAt, deliveryStatus, messageType, mediaUrl, mediaDuration,
   expiresAt, tempId }
 ```
@@ -181,10 +180,10 @@ Gateway verifies JWT, stores `client.data.user = { id, email, username }`, track
 | DTO | Fields | Notes |
 |---|---|---|
 | `SendMessageDto` | recipientId (int+), content (str 1-5000), expiresIn?, tempId?, messageType?, mediaUrl?, mediaDuration? | content validation skipped for VOICE/PING via `@ValidateIf`; mediaUrl validated as Cloudinary URL |
-| `SendFriendRequestDto` | recipientEmail (str 5-255) | |
+| `SendFriendRequestDto` | recipientUsername (str 3-20, alphanumeric+underscore) | |
 | `AcceptFriendRequestDto` / `RejectFriendRequestDto` | requestId (int+) | |
 | `GetMessagesDto` | conversationId (int+), limit?, offset? | |
-| `StartConversationDto` | recipientEmail (str 5-255) | |
+| `StartConversationDto` | recipientUsername (str 3-20, alphanumeric+underscore) | |
 | `UnfriendDto` | userId (int+) | |
 | `ClearChatHistoryDto` / `SetDisappearingTimerDto` / `DeleteConversationOnlyDto` / `SendPingDto` | conversationId or recipientId (int+) | separate files |
 
@@ -194,8 +193,8 @@ Gateway verifies JWT, stores `client.data.user = { id, email, username }`, track
 
 | Method | Path | Auth | Body / Params | Response |
 |---|---|---|---|---|
-| POST | `/auth/register` | -- | `{ email, password, username? }` | 201: `{ id, email, username }` |
-| POST | `/auth/login` | -- | `{ email, password }` | 200: `{ access_token }` |
+| POST | `/auth/register` | -- | `{ username, password }` | 201: `{ id, username }` |
+| POST | `/auth/login` | -- | `{ username, password }` | 200: `{ access_token }` |
 | POST | `/users/profile-picture` | JWT | multipart `file` (JPEG/PNG, max 5MB) | `{ profilePictureUrl }` |
 | POST | `/users/reset-password` | JWT | `{ oldPassword, newPassword }` | 200 |
 | DELETE | `/users/account` | JWT | `{ password }` | 200 (cascade deletes all data) |
@@ -206,7 +205,9 @@ Gateway verifies JWT, stores `client.data.user = { id, email, username }`, track
 
 **Rate limits:** Login 5/15min, Register 3/h, Image 10/min, Voice 10/60s.
 
-**JWT payload:** `{ sub: userId, email, username, profilePictureUrl }`. Frontend decodes via `jwt_decoder`.
+**JWT payload:** `{ sub: userId, username, profilePictureUrl }`. Frontend decodes via `jwt_decoder`.
+
+**Username rules:** 3-20 chars, alphanumeric + underscore only (`/^[a-zA-Z0-9_]+$/`), case-insensitive uniqueness.
 
 **Audit logging:** Login success/failure, resetPassword, deleteAccount — Logger('Audit') to stdout.
 
@@ -218,7 +219,7 @@ Gateway verifies JWT, stores `client.data.user = { id, email, username }`, track
 
 **Key screens:** AuthScreen (`clearStatus()` on tab switch — DO NOT DELETE), ConversationsScreen (swipe-to-delete, `consumePendingOpen()` pattern), ChatDetailScreen (Timer.periodic 1s for `removeExpiredMessages()`, `markConversationRead` on open), AddOrInvitationsScreen (`consumeFriendRequestSent()` pattern).
 
-**Key widgets:** ChatInputBar (text+send+mic hold-to-record+action tiles), ChatActionTiles (Camera/Gallery/Ping/Timer/Clear/Drawing), ChatMessageBubble (TEXT/PING/IMAGE/DRAWING/VOICE), VoiceMessageBubble (scrubbable waveform, speed toggle 1x/1.5x/2x), ConversationTile (Dismissible swipe-to-delete, unread badge), TopSnackbar (all notifications — never use ScaffoldMessenger), AvatarCircle (stable cache-bust per profilePictureUrl).
+**Key widgets:** ChatInputBar (text+send+mic hold-to-record+action tiles), ChatActionTiles (Camera/Gallery/Ping/Timer/Clear/Drawing), ChatMessageBubble (TEXT/PING/IMAGE/DRAWING/VOICE), VoiceMessageBubble (scrubbable waveform, speed toggle 1x/1.5x/2x), ConversationTile (Dismissible swipe-to-delete, unread badge), TopSnackbar (all notifications — never use ScaffoldMessenger), AvatarCircle (`displayName` param, stable cache-bust per profilePictureUrl).
 
 ---
 
@@ -248,9 +249,9 @@ Loads JWT from SharedPreferences on construction. `login()`: POST -> decode -> s
 
 | Model | Key Fields | Notes |
 |---|---|---|
-| `UserModel` | id, email, username?, profilePictureUrl? | `copyWith()` all fields |
+| `UserModel` | id, username, profilePictureUrl? | `copyWith()` all fields |
 | `ConversationModel` | id, userOne, userTwo, createdAt, disappearingTimer? | Immutable |
-| `MessageModel` | id, content, senderId, conversationId, deliveryStatus, messageType, mediaUrl?, mediaDuration?, expiresAt?, tempId? | `copyWith()` for deliveryStatus, expiresAt, mediaUrl, mediaDuration |
+| `MessageModel` | id, content, senderId, senderUsername, conversationId, deliveryStatus, messageType, mediaUrl?, mediaDuration?, expiresAt?, tempId? | `copyWith()` for deliveryStatus, expiresAt, mediaUrl, mediaDuration |
 | `FriendRequestModel` | id, sender, receiver, status, createdAt, respondedAt? | |
 
 **Frontend-only enum value:** `MessageDeliveryStatus.failed` (not in backend).
@@ -428,6 +429,15 @@ Frontend runs locally: `flutter run -d chrome`
 
 ## 13. Recent Changes
 
+**2026-02-18:**
+- **Email removed:** Username is now the sole user identifier (no email column). User entity, auth DTOs, JWT payload, all mappers, frontend models, and UI updated. Existing DB users must re-register.
+- `UserMapper.toPayload()` returns `{ id, username, profilePictureUrl }` (no email)
+- `MessageMapper.toPayload()` returns `senderUsername` (no `senderEmail`)
+- `AvatarCircle` param renamed from `email` to `displayName`
+- `SendFriendRequestDto`/`StartConversationDto`: `recipientEmail` → `recipientUsername`
+- Auth: `register(username, password)`, `login(username, password)` — no email anywhere
+- 27 backend tests passing, `flutter analyze` clean
+
 **2026-02-17:**
 - mediaUrl validation (Cloudinary URL regex, prevents SSRF), audit logging, Socket.IO token in auth only, Helmet middleware, RegisterDto password validation
 - Production security: JWT fails without secret in prod, strict CORS in prod, `.env.example`
@@ -445,7 +455,7 @@ Frontend runs locally: `flutter run -d chrome`
 ## 14. Known Limitations & Tech Debt
 
 ### Limitations
-- No user search (only add by exact email), no typing indicators, no message edit/delete, no push notifications
+- No user search (only add by exact username), no typing indicators, no message edit/delete, no push notifications
 - No unique constraint on `(sender, receiver)` in friend_requests
 - Message pagination: simple limit/offset (default 50), `_conversationsWithUnread()` has N+1
 

@@ -3,13 +3,13 @@ import '../theme/rpg_theme.dart';
 import '../config/app_config.dart';
 
 class AvatarCircle extends StatefulWidget {
-  final String email;
+  final String displayName;
   final double radius;
   final String? profilePictureUrl;
 
   const AvatarCircle({
     super.key,
-    required this.email,
+    required this.displayName,
     this.radius = 22,
     this.profilePictureUrl,
   });
@@ -56,7 +56,7 @@ class _AvatarCircleState extends State<AvatarCircle> {
 
   @override
   Widget build(BuildContext context) {
-    final letter = widget.email.isNotEmpty ? widget.email[0].toUpperCase() : '?';
+    final letter = widget.displayName.isNotEmpty ? widget.displayName[0].toUpperCase() : '?';
     final isDark = RpgTheme.isDark(context);
     final gradientColors = isDark
         ? const [RpgTheme.borderDark, RpgTheme.accentDark]

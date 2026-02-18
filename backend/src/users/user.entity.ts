@@ -11,9 +11,6 @@ export class User {
   id: number;
 
   @Column({ unique: true })
-  email: string;
-
-  @Column({ unique: true, nullable: true })
   username: string;
 
   // Password stored as bcrypt hash — never plain text

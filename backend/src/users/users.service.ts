@@ -31,39 +31,23 @@ export class UsersService {
   ) {}
 
   async create(
-    email: string,
+    username: string,
     password: string,
-    username?: string,
   ): Promise<User> {
-    // Check if email is already taken
-    const existing = await this.usersRepo.findOne({ where: { email } });
-    if (existing) {
-      throw new ConflictException('Email already in use');
-    }
-
     // Check if username is already taken (case-insensitive)
-    if (username) {
-      const existingUsername = await this.usersRepo
-        .createQueryBuilder('user')
-        .where('LOWER(user.username) = LOWER(:username)', { username })
-        .getOne();
-      if (existingUsername) {
-        throw new ConflictException('Username already in use');
-      }
+    const existingUsername = await this.usersRepo
+      .createQueryBuilder('user')
+      .where('LOWER(user.username) = LOWER(:username)', { username })
+      .getOne();
+    if (existingUsername) {
+      throw new ConflictException('Username already in use');
     }
 
     // 10 bcrypt rounds — good balance of security and performance
     const hash = await bcrypt.hash(password, 10);
 
-    const user = this.usersRepo.create({ email, password: hash, username });
+    const user = this.usersRepo.create({ password: hash, username });
     return this.usersRepo.save(user);
-  }
-
-  async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepo
-      .createQueryBuilder('user')
-      .where('LOWER(user.email) = LOWER(:email)', { email })
-      .getOne();
   }
 
   async findById(id: number): Promise<User | null> {
@@ -161,6 +145,6 @@ export class UsersService {
     }
 
     await this.usersRepo.remove(user);
-    this.auditLogger.log(`deleteAccount success userId=${userId} email=${user.email}`);
+    this.auditLogger.log(`deleteAccount success userId=${userId} username=${user.username}`);
   }
 }

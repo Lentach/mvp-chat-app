@@ -18,7 +18,6 @@ describe('AuthService', () => {
 
   const mockUser: Partial<User> = {
     id: 1,
-    email: 'test@example.com',
     username: 'testuser',
     password: 'hashed_password',
   };
@@ -31,7 +30,7 @@ describe('AuthService', () => {
           provide: UsersService,
           useValue: {
             create: jest.fn(),
-            findByEmail: jest.fn(),
+            findByUsername: jest.fn(),
           },
         },
         {
@@ -52,51 +51,40 @@ describe('AuthService', () => {
   describe('register', () => {
     it('should create user with valid password', async () => {
       usersService.create.mockResolvedValue(mockUser as User);
-      const result = await service.register('test@example.com', 'ValidPass1');
+      const result = await service.register('testuser', 'ValidPass1');
       expect(usersService.create).toHaveBeenCalledWith(
-        'test@example.com',
+        'testuser',
         'ValidPass1',
-        undefined,
       );
-      expect(result).toEqual({ id: 1, email: 'test@example.com', username: 'testuser' });
-    });
-
-    it('should pass username when provided', async () => {
-      usersService.create.mockResolvedValue(mockUser as User);
-      await service.register('test@example.com', 'ValidPass1', 'myuser');
-      expect(usersService.create).toHaveBeenCalledWith(
-        'test@example.com',
-        'ValidPass1',
-        'myuser',
-      );
+      expect(result).toEqual({ id: 1, username: 'testuser' });
     });
 
     it('should reject password shorter than 8 chars', async () => {
-      await expect(service.register('test@example.com', 'Short1')).rejects.toThrow(
+      await expect(service.register('testuser', 'Short1')).rejects.toThrow(
         BadRequestException,
       );
-      await expect(service.register('test@example.com', 'Short1')).rejects.toThrow(
+      await expect(service.register('testuser', 'Short1')).rejects.toThrow(
         /at least 8 characters/,
       );
       expect(usersService.create).not.toHaveBeenCalled();
     });
 
     it('should reject password without uppercase', async () => {
-      await expect(service.register('test@example.com', 'lowercase1')).rejects.toThrow(
+      await expect(service.register('testuser', 'lowercase1')).rejects.toThrow(
         BadRequestException,
       );
       expect(usersService.create).not.toHaveBeenCalled();
     });
 
     it('should reject password without lowercase', async () => {
-      await expect(service.register('test@example.com', 'UPPERCASE1')).rejects.toThrow(
+      await expect(service.register('testuser', 'UPPERCASE1')).rejects.toThrow(
         BadRequestException,
       );
       expect(usersService.create).not.toHaveBeenCalled();
     });
 
     it('should reject password without number', async () => {
-      await expect(service.register('test@example.com', 'NoNumberHere')).rejects.toThrow(
+      await expect(service.register('testuser', 'NoNumberHere')).rejects.toThrow(
         BadRequestException,
       );
       expect(usersService.create).not.toHaveBeenCalled();
@@ -105,36 +93,35 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should return access_token for valid credentials', async () => {
-      usersService.findByEmail.mockResolvedValue(mockUser as User);
+      usersService.findByUsername.mockResolvedValue(mockUser as User);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      const result = await service.login('test@example.com', 'ValidPass1');
+      const result = await service.login('testuser', 'ValidPass1');
       expect(result).toEqual({ access_token: 'mock_jwt_token' });
       expect(jwtService.sign).toHaveBeenCalledWith({
         sub: 1,
-        email: 'test@example.com',
         username: 'testuser',
         profilePictureUrl: undefined,
       });
     });
 
     it('should throw when user not found', async () => {
-      usersService.findByEmail.mockResolvedValue(null);
-      await expect(service.login('unknown@example.com', 'ValidPass1')).rejects.toThrow(
+      usersService.findByUsername.mockResolvedValue(null);
+      await expect(service.login('unknown', 'ValidPass1')).rejects.toThrow(
         UnauthorizedException,
       );
-      await expect(service.login('unknown@example.com', 'ValidPass1')).rejects.toThrow(
+      await expect(service.login('unknown', 'ValidPass1')).rejects.toThrow(
         'Invalid credentials',
       );
       expect(bcrypt.compare).not.toHaveBeenCalled();
     });
 
     it('should throw when password invalid', async () => {
-      usersService.findByEmail.mockResolvedValue(mockUser as User);
+      usersService.findByUsername.mockResolvedValue(mockUser as User);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-      await expect(service.login('test@example.com', 'WrongPass1')).rejects.toThrow(
+      await expect(service.login('testuser', 'WrongPass1')).rejects.toThrow(
         UnauthorizedException,
       );
-      await expect(service.login('test@example.com', 'WrongPass1')).rejects.toThrow(
+      await expect(service.login('testuser', 'WrongPass1')).rejects.toThrow(
         'Invalid credentials',
       );
     });

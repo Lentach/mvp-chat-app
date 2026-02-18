@@ -8,7 +8,6 @@ function createMockMessage(overrides: Partial<Message> = {}): Message {
     content: 'Hello',
     sender: {
       id: 10,
-      email: 'sender@example.com',
       username: 'sender',
       profilePictureUrl: null,
     } as unknown as User,
@@ -31,7 +30,6 @@ describe('MessageMapper', () => {
       id: 1,
       content: 'Hello',
       senderId: 10,
-      senderEmail: 'sender@example.com',
       senderUsername: 'sender',
       conversationId: 5,
       deliveryStatus: 'SENT',

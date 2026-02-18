@@ -16,5 +16,5 @@ UserModel? getOtherUser(ConversationModel conv, int? currentUserId) {
 String getOtherUserUsername(ConversationModel conv, int? currentUserId) {
   if (currentUserId == null) return '';
   final other = getOtherUser(conv, currentUserId);
-  return other?.username ?? other?.email ?? '';
+  return other?.username ?? '';
 }

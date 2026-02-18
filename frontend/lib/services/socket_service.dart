@@ -148,9 +148,9 @@ class SocketService {
     });
   }
 
-  void startConversation(String recipientEmail) {
+  void startConversation(String recipientUsername) {
     _socket?.emit('startConversation', {
-      'recipientEmail': recipientEmail,
+      'recipientUsername': recipientUsername,
     });
   }
 
@@ -169,9 +169,9 @@ class SocketService {
     });
   }
 
-  void sendFriendRequest(String recipientEmail) {
+  void sendFriendRequest(String recipientUsername) {
     _socket?.emit('sendFriendRequest', {
-      'recipientEmail': recipientEmail,
+      'recipientUsername': recipientUsername,
     });
   }
 

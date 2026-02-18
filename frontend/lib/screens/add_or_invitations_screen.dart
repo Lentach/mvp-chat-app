@@ -4,7 +4,7 @@ import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
 import '../widgets/top_snackbar.dart';
 
-/// Single screen with tabs: Add by email, Friend requests.
+/// Single screen with tabs: Add by username, Friend requests.
 class AddOrInvitationsScreen extends StatelessWidget {
   const AddOrInvitationsScreen({super.key});
 
@@ -25,14 +25,14 @@ class AddOrInvitationsScreen extends StatelessWidget {
           ),
           bottom: TabBar(
             tabs: const [
-              Tab(text: 'Add by email'),
+              Tab(text: 'Add by username'),
               Tab(text: 'Friend requests'),
             ],
           ),
         ),
         body: const TabBarView(
           children: [
-            _AddByEmailTab(),
+            _AddByUsernameTab(),
             _FriendRequestsTab(),
           ],
         ),
@@ -41,34 +41,34 @@ class AddOrInvitationsScreen extends StatelessWidget {
   }
 }
 
-class _AddByEmailTab extends StatefulWidget {
-  const _AddByEmailTab();
+class _AddByUsernameTab extends StatefulWidget {
+  const _AddByUsernameTab();
 
   @override
-  State<_AddByEmailTab> createState() => _AddByEmailTabState();
+  State<_AddByUsernameTab> createState() => _AddByUsernameTabState();
 }
 
-class _AddByEmailTabState extends State<_AddByEmailTab> {
-  final _emailController = TextEditingController();
+class _AddByUsernameTabState extends State<_AddByUsernameTab> {
+  final _usernameController = TextEditingController();
   bool _loading = false;
   bool _requestSent = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
   void _startChat() {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) return;
+    final username = _usernameController.text.trim();
+    if (username.isEmpty) return;
 
     setState(() {
       _loading = true;
       _requestSent = false;
     });
     context.read<ChatProvider>().clearError();
-    context.read<ChatProvider>().sendFriendRequest(email);
+    context.read<ChatProvider>().sendFriendRequest(username);
   }
 
   @override
@@ -89,10 +89,10 @@ class _AddByEmailTabState extends State<_AddByEmailTab> {
     if (chat.consumeFriendRequestSent() && _loading && !_requestSent) {
       _requestSent = true;
       _loading = false;
-      final email = _emailController.text.trim();
+      final username = _usernameController.text.trim();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          showTopSnackBar(context, 'Friend request sent to $email', backgroundColor: Colors.green);
+          showTopSnackBar(context, 'Friend request sent to $username', backgroundColor: Colors.green);
           Navigator.pop(context);
         }
       });
@@ -110,7 +110,7 @@ class _AddByEmailTabState extends State<_AddByEmailTab> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Enter the email of the person you want to add:',
+              'Enter the username of the person you want to add:',
               style: RpgTheme.bodyFont(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -118,17 +118,16 @@ class _AddByEmailTabState extends State<_AddByEmailTab> {
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: _emailController,
+              controller: _usernameController,
               style: RpgTheme.bodyFont(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
               decoration: RpgTheme.rpgInputDecoration(
-                hintText: 'user@example.com',
-                prefixIcon: Icons.email_outlined,
+                hintText: 'username',
+                prefixIcon: Icons.person_outlined,
                 context: context,
               ),
-              keyboardType: TextInputType.emailAddress,
               autofocus: true,
               onSubmitted: (_) => _startChat(),
             ),
@@ -234,7 +233,7 @@ class _FriendRequestsTabState extends State<_FriendRequestsTab> {
           itemCount: chatConsumer.friendRequests.length,
           itemBuilder: (context, index) {
             final request = chatConsumer.friendRequests[index];
-            final displayName = request.sender.username ?? request.sender.email;
+            final displayName = request.sender.username;
             final firstLetter =
                 displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
 

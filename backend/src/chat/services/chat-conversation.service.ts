@@ -41,7 +41,7 @@ export class ChatConversationService {
     }
 
     const user = await this.usersService.findById(userId);
-    const otherUser = await this.usersService.findByEmail(data.recipientEmail);
+    const otherUser = await this.usersService.findByUsername(data.recipientUsername);
 
     if (!user || !otherUser) {
       client.emit('error', { message: 'User not found' });
@@ -86,7 +86,7 @@ export class ChatConversationService {
     }
 
     this.logger.debug(
-      `handleGetConversations: userId=${userId}, email=${client.data.user?.email}`,
+      `handleGetConversations: userId=${userId}, username=${client.data.user?.username}`,
     );
     const conversations = await this.conversationsService.findByUser(userId);
     this.logger.debug(

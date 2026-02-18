@@ -18,8 +18,7 @@ class MessageModel {
   final int id;
   final String content;
   final int senderId;
-  final String senderEmail;
-  final String? senderUsername;
+  final String senderUsername;
   final int conversationId;
   final DateTime createdAt;
   final MessageDeliveryStatus deliveryStatus;
@@ -33,8 +32,7 @@ class MessageModel {
     required this.id,
     required this.content,
     required this.senderId,
-    required this.senderEmail,
-    this.senderUsername,
+    required this.senderUsername,
     required this.conversationId,
     required this.createdAt,
     this.deliveryStatus = MessageDeliveryStatus.sent,
@@ -50,8 +48,7 @@ class MessageModel {
       id: json['id'] as int,
       content: json['content'] as String? ?? '',
       senderId: json['senderId'] as int,
-      senderEmail: json['senderEmail'] as String,
-      senderUsername: json['senderUsername'] as String?,
+      senderUsername: json['senderUsername'] as String? ?? '',
       conversationId: json['conversationId'] as int,
       createdAt: DateTime.parse(json['createdAt'] as String),
       deliveryStatus: parseDeliveryStatus(json['deliveryStatus'] as String?),
@@ -110,7 +107,6 @@ class MessageModel {
       id: id,
       content: content,
       senderId: senderId,
-      senderEmail: senderEmail,
       senderUsername: senderUsername,
       conversationId: conversationId,
       createdAt: createdAt,

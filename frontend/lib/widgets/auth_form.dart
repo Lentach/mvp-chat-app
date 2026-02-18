@@ -3,7 +3,7 @@ import '../theme/rpg_theme.dart';
 
 class AuthForm extends StatefulWidget {
   final bool isLogin;
-  final Future<void> Function(String email, String password, String? username) onSubmit;
+  final Future<void> Function(String username, String password) onSubmit;
 
   const AuthForm({
     super.key,
@@ -16,30 +16,25 @@ class AuthForm extends StatefulWidget {
 }
 
 class _AuthFormState extends State<AuthForm> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _loading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
     _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSubmit() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
       return;
     }
     setState(() => _loading = true);
     await widget.onSubmit(
-      _emailController.text.trim(),
+      _usernameController.text.trim(),
       _passwordController.text,
-      widget.isLogin ? null : _usernameController.text.trim().isEmpty
-          ? null
-          : _usernameController.text.trim(),
     );
     if (mounted) setState(() => _loading = false);
   }
@@ -51,34 +46,21 @@ class _AuthFormState extends State<AuthForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextField(
-          controller: _emailController,
+          controller: _usernameController,
           style: RpgTheme.bodyFont(fontSize: 14, color: colorScheme.onSurface),
           decoration: RpgTheme.rpgInputDecoration(
-            hintText: 'Email',
-            prefixIcon: Icons.email_outlined,
+            hintText: 'Username',
+            prefixIcon: Icons.person_outlined,
             context: context,
           ),
-          keyboardType: TextInputType.emailAddress,
           onSubmitted: (_) => _handleSubmit(),
         ),
         const SizedBox(height: 16),
-        if (!widget.isLogin) ...[
-          TextField(
-            controller: _usernameController,
-            style: RpgTheme.bodyFont(fontSize: 14, color: Colors.white),
-            decoration: RpgTheme.rpgInputDecoration(
-              hintText: 'Username (optional)',
-              prefixIcon: Icons.person_outlined,
-            ),
-            onSubmitted: (_) => _handleSubmit(),
-          ),
-          const SizedBox(height: 16),
-        ],
         TextField(
           controller: _passwordController,
           style: RpgTheme.bodyFont(fontSize: 14, color: colorScheme.onSurface),
           decoration: RpgTheme.rpgInputDecoration(
-            hintText: widget.isLogin ? 'Password' : 'Password (min 6 chars)',
+            hintText: widget.isLogin ? 'Password' : 'Password (min 8 chars)',
             prefixIcon: Icons.lock_outlined,
             context: context,
           ),

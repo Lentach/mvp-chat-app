@@ -53,9 +53,12 @@ export class SendMessageDto {
 
 export class SendFriendRequestDto {
   @IsString()
-  @MinLength(5, { message: 'Email must be at least 5 characters' })
-  @MaxLength(255, { message: 'Email cannot exceed 255 characters' })
-  recipientEmail: string;
+  @MinLength(3, { message: 'Username must be at least 3 characters' })
+  @MaxLength(20, { message: 'Username cannot exceed 20 characters' })
+  @Matches(/^[a-zA-Z0-9_]+$/, {
+    message: 'Username can only contain letters, numbers and underscores',
+  })
+  recipientUsername: string;
 }
 
 export class AcceptFriendRequestDto {
@@ -88,9 +91,12 @@ export class GetMessagesDto {
 
 export class StartConversationDto {
   @IsString()
-  @MinLength(5, { message: 'Email must be at least 5 characters' })
-  @MaxLength(255, { message: 'Email cannot exceed 255 characters' })
-  recipientEmail: string;
+  @MinLength(3, { message: 'Username must be at least 3 characters' })
+  @MaxLength(20, { message: 'Username cannot exceed 20 characters' })
+  @Matches(/^[a-zA-Z0-9_]+$/, {
+    message: 'Username can only contain letters, numbers and underscores',
+  })
+  recipientUsername: string;
 }
 
 export class UnfriendDto {

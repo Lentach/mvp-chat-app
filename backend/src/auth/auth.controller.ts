@@ -13,7 +13,7 @@ export class AuthController {
   @Throttle({ default: { limit: 3, ttl: 3600000 } })
   @Post('register')
   register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto.email, dto.password, dto.username);
+    return this.authService.register(dto.username, dto.password);
   }
 
   // POST /auth/login — returns JWT token
@@ -21,6 +21,6 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 900000 } })
   @Post('login')
   login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.email, dto.password);
+    return this.authService.login(dto.username, dto.password);
   }
 }

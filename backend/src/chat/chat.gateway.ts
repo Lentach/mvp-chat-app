@@ -87,12 +87,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Store user data in the socket object
       client.data.user = {
         id: user.id,
-        email: user.email,
         username: user.username,
       };
       this.onlineUsers.set(user.id, client.id);
 
-      this.logger.debug(`User connected: ${user.email} (socket: ${client.id})`);
+      this.logger.debug(`User connected: ${user.username} (socket: ${client.id})`);
     } catch (error) {
       this.logger.error(`handleConnection failed: ${error.message}`);
       client.disconnect();
@@ -102,7 +101,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(client: Socket) {
     if (client.data.user) {
       this.onlineUsers.delete(client.data.user.id);
-      this.logger.debug(`User disconnected: ${client.data.user.email}`);
+      this.logger.debug(`User disconnected: ${client.data.user.username}`);
     }
   }
 
