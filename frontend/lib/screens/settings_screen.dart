@@ -247,7 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  auth.currentUser?.username ?? 'Hero',
+                  '${auth.currentUser?.username ?? 'Hero'}#${auth.currentUser?.tag ?? '0000'}',
                   style: RpgTheme.bodyFont(
                     fontSize: 20,
                     color: theme.colorScheme.onSurface,

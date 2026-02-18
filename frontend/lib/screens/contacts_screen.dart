@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
+import '../models/user_model.dart';
 import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
 import '../widgets/avatar_circle.dart';
@@ -9,7 +10,7 @@ import 'chat_detail_screen.dart';
 class ContactsScreen extends StatelessWidget {
   const ContactsScreen({super.key});
 
-  void _openChatWithContact(BuildContext context, int userId, String username) {
+  void _openChatWithContact(BuildContext context, int userId) {
     final chat = context.read<ChatProvider>();
 
     // Check if conversation exists for this user
@@ -32,12 +33,12 @@ class ContactsScreen extends StatelessWidget {
       }
     } else {
       // No conversation, start new one (backend will create)
-      chat.socket.startConversation(username);
+      chat.socket.startConversation(userId);
       // consumePendingOpen will handle navigation when backend responds
     }
   }
 
-  void _unfriendContact(BuildContext context, int userId, String username) {
+  void _unfriendContact(BuildContext context, int userId, String displayHandle) {
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -56,7 +57,7 @@ class ContactsScreen extends StatelessWidget {
             ),
           ),
           content: Text(
-            'Remove $username from your contacts? This will delete all conversation history.',
+            'Remove $displayHandle from your contacts? This will delete all conversation history.',
             style: RpgTheme.bodyFont(
               fontSize: 14,
               color: colorScheme.onSurface.withValues(alpha: 0.8),
@@ -187,15 +188,15 @@ class ContactsScreen extends StatelessWidget {
 
   Widget _buildContactTile(BuildContext context, dynamic friend) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    final username = friend.username as String;
+    final user = friend as UserModel;
+    final displayHandle = user.displayHandle;
 
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        onTap: () => _openChatWithContact(context, friend.id, username),
-        onLongPress: () => _unfriendContact(context, friend.id, username),
+        onTap: () => _openChatWithContact(context, user.id),
+        onLongPress: () => _unfriendContact(context, user.id, displayHandle),
         borderRadius: BorderRadius.circular(8),
         splashColor: RpgTheme.primaryColor(context).withValues(alpha: 0.2),
         child: Padding(
@@ -203,13 +204,13 @@ class ContactsScreen extends StatelessWidget {
           child: Row(
             children: [
               AvatarCircle(
-                displayName: username,
-                profilePictureUrl: friend.profilePictureUrl,
+                displayName: user.username,
+                profilePictureUrl: user.profilePictureUrl,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  username,
+                  displayHandle,
                   style: RpgTheme.bodyFont(
                     fontSize: 14,
                     color: colorScheme.onSurface,

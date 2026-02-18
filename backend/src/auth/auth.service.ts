@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
@@ -38,28 +39,39 @@ export class AuthService {
   async register(username: string, password: string) {
     this.validatePassword(password);
     const user = await this.usersService.create(username, password);
-    return { id: user.id, username: user.username };
+    return { id: user.id, username: user.username, tag: user.tag };
   }
 
-  async login(username: string, password: string) {
-    const user = await this.usersService.findByUsername(username);
+  async login(identifier: string, password: string) {
+    let user: User | null = null;
+    if (identifier.includes('#')) {
+      const [u, t] = identifier.split('#');
+      if (u && t) user = await this.usersService.findByUsernameAndTag(u.trim(), t.trim());
+    } else {
+      const users = await this.usersService.findByUsername(identifier.trim());
+      if (users.length === 1) user = users[0];
+      else if (users.length > 1) {
+        this.auditLogger.log(`login failed identifier=${identifier} (multiple users)`);
+        throw new UnauthorizedException('Multiple users found, please use username#tag');
+      }
+    }
     if (!user) {
-      this.auditLogger.log(`login failed username=${username}`);
+      this.auditLogger.log(`login failed identifier=${identifier}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const passwordValid = await bcrypt.compare(password, user.password);
     if (!passwordValid) {
-      this.auditLogger.log(`login failed username=${username}`);
+      this.auditLogger.log(`login failed identifier=${identifier}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    this.auditLogger.log(`login success userId=${user.id} username=${username}`);
+    this.auditLogger.log(`login success userId=${user.id} username=${user.username}`);
 
-    // Token payload — sub is the JWT standard for "subject" (user id)
     const payload = {
       sub: user.id,
       username: user.username,
+      tag: user.tag,
       profilePictureUrl: user.profilePictureUrl,
     };
     return {

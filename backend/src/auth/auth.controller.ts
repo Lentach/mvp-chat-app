@@ -21,6 +21,6 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 900000 } })
   @Post('login')
   login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.username, dto.password);
+    return this.authService.login(dto.identifier, dto.password);
   }
 }

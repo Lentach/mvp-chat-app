@@ -78,7 +78,8 @@ erDiagram
 
     users {
         int id PK
-        string username UK "required, case-insensitive"
+        string username "not unique alone"
+        string tag "4-digit, unique with username"
         string password "bcrypt hash, 10 rounds"
         string profilePictureUrl "nullable"
         string profilePicturePublicId "nullable, Cloudinary"
@@ -118,14 +119,14 @@ erDiagram
 
 **TypeORM config:** `synchronize: true` -- column additions auto-apply on restart. No migrations.
 
-**Key constraints:** `friend_requests` index on `(sender, receiver)`. No cascade on User entity -- `deleteAccount()` manually cleans dependents. `conversations.delete()` must delete messages first (no cascade).
+**Key constraints:** `users` unique on `(username, tag)` — Discord-style handle `username#tag`. `friend_requests` index on `(sender, receiver)`. No cascade on User entity -- `deleteAccount()` manually cleans dependents. `conversations.delete()` must delete messages first (no cascade).
 
 ---
 
 ## 3. WebSocket API -- Complete Event Reference
 
 **Connection:** `io(baseUrl, { auth: { token: JWT } })` — token in auth only (not query) to avoid URL/log leakage.
-Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onlineUsers: Map<userId, socketId>`.
+Gateway verifies JWT, stores `client.data.user = { id, username, tag }`, tracks `onlineUsers: Map<userId, socketId>`.
 
 ### 3.1 Message Events
 
@@ -151,6 +152,7 @@ Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onli
 
 | Client Emit | Server Emit (caller) | Server Emit (other) |
 |---|---|---|
+| `searchUsers` | `searchUsersResult` (UserPayload[]) | -- |
 | `sendFriendRequest` | `friendRequestSent` OR auto-accept flow | `newFriendRequest` OR auto-accept |
 | `acceptFriendRequest` | `friendRequestAccepted` + lists + `openConversation` | same |
 | `rejectFriendRequest` | `friendRequestRejected` + `friendRequestsList` | -- |
@@ -162,7 +164,7 @@ Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onli
 
 **Message payload** (`messageSent` / `newMessage` / `pingSent` / `newPing`):
 ```typescript
-{ id, content, senderId, senderUsername, conversationId,
+{ id, content, senderId, senderEmail, senderUsername, conversationId,
   createdAt, deliveryStatus, messageType, mediaUrl, mediaDuration,
   expiresAt, tempId }
 ```
@@ -180,10 +182,11 @@ Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onli
 | DTO | Fields | Notes |
 |---|---|---|
 | `SendMessageDto` | recipientId (int+), content (str 1-5000), expiresIn?, tempId?, messageType?, mediaUrl?, mediaDuration? | content validation skipped for VOICE/PING via `@ValidateIf`; mediaUrl validated as Cloudinary URL |
-| `SendFriendRequestDto` | recipientUsername (str 3-20, alphanumeric+underscore) | |
+| `SearchUsersDto` | username (str 3-20, a-z 0-9 _) | |
+| `SendFriendRequestDto` | recipientId (int+) | |
 | `AcceptFriendRequestDto` / `RejectFriendRequestDto` | requestId (int+) | |
 | `GetMessagesDto` | conversationId (int+), limit?, offset? | |
-| `StartConversationDto` | recipientUsername (str 3-20, alphanumeric+underscore) | |
+| `StartConversationDto` | recipientId (int+) | |
 | `UnfriendDto` | userId (int+) | |
 | `ClearChatHistoryDto` / `SetDisappearingTimerDto` / `DeleteConversationOnlyDto` / `SendPingDto` | conversationId or recipientId (int+) | separate files |
 
@@ -193,8 +196,8 @@ Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onli
 
 | Method | Path | Auth | Body / Params | Response |
 |---|---|---|---|---|
-| POST | `/auth/register` | -- | `{ username, password }` | 201: `{ id, username }` |
-| POST | `/auth/login` | -- | `{ username, password }` | 200: `{ access_token }` |
+| POST | `/auth/register` | -- | `{ username, password }` | 201: `{ id, username, tag }` |
+| POST | `/auth/login` | -- | `{ identifier, password }` | 200: `{ access_token }` |
 | POST | `/users/profile-picture` | JWT | multipart `file` (JPEG/PNG, max 5MB) | `{ profilePictureUrl }` |
 | POST | `/users/reset-password` | JWT | `{ oldPassword, newPassword }` | 200 |
 | DELETE | `/users/account` | JWT | `{ password }` | 200 (cascade deletes all data) |
@@ -205,9 +208,9 @@ Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onli
 
 **Rate limits:** Login 5/15min, Register 3/h, Image 10/min, Voice 10/60s.
 
-**JWT payload:** `{ sub: userId, username, profilePictureUrl }`. Frontend decodes via `jwt_decoder`.
+**Login identifier:** username or `username#tag` (e.g. `john#0427`). When multiple users share a username, use full handle.
 
-**Username rules:** 3-20 chars, alphanumeric + underscore only (`/^[a-zA-Z0-9_]+$/`), case-insensitive uniqueness.
+**JWT payload:** `{ sub: userId, username, tag, profilePictureUrl }`. Frontend decodes via `jwt_decoder`.
 
 **Audit logging:** Login success/failure, resetPassword, deleteAccount — Logger('Audit') to stdout.
 
@@ -217,9 +220,9 @@ Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onli
 
 **Navigation:** AuthGate -> AuthScreen (login/register) OR MainShell (IndexedStack: Conversations, Contacts, Settings). Conversations/Contacts -> ChatDetailScreen. Conversations + button -> AddOrInvitationsScreen. Desktop >600px: sidebar+detail layout.
 
-**Key screens:** AuthScreen (`clearStatus()` on tab switch — DO NOT DELETE), ConversationsScreen (swipe-to-delete, `consumePendingOpen()` pattern), ChatDetailScreen (Timer.periodic 1s for `removeExpiredMessages()`, `markConversationRead` on open), AddOrInvitationsScreen (`consumeFriendRequestSent()` pattern).
+**Key screens:** AuthScreen (login by username or username#tag, `clearStatus()` on tab switch — DO NOT DELETE), ConversationsScreen (swipe-to-delete, `consumePendingOpen()` pattern), ChatDetailScreen (Timer.periodic 1s for `removeExpiredMessages()`, `markConversationRead` on open), AddOrInvitationsScreen (searchUsers -> 1 result auto-send, multiple results picker, `consumeFriendRequestSent()` pattern).
 
-**Key widgets:** ChatInputBar (text+send+mic hold-to-record+action tiles), ChatActionTiles (Camera/Gallery/Ping/Timer/Clear/Drawing), ChatMessageBubble (TEXT/PING/IMAGE/DRAWING/VOICE), VoiceMessageBubble (scrubbable waveform, speed toggle 1x/1.5x/2x), ConversationTile (Dismissible swipe-to-delete, unread badge), TopSnackbar (all notifications — never use ScaffoldMessenger), AvatarCircle (`displayName` param, stable cache-bust per profilePictureUrl).
+**Key widgets:** ChatInputBar (text+send+mic hold-to-record+action tiles), ChatActionTiles (Camera/Gallery/Ping/Timer/Clear/Drawing), ChatMessageBubble (TEXT/PING/IMAGE/DRAWING/VOICE), VoiceMessageBubble (scrubbable waveform, speed toggle 1x/1.5x/2x), ConversationTile (Dismissible swipe-to-delete, unread badge), TopSnackbar (all notifications — never use ScaffoldMessenger), AvatarCircle (stable cache-bust per profilePictureUrl).
 
 ---
 
@@ -227,7 +230,7 @@ Gateway verifies JWT, stores `client.data.user = { id, username }`, tracks `onli
 
 ### 6.1 ChatProvider (central hub)
 
-**Files:** `providers/chat_provider.dart` (~750 lines), `providers/chat_reconnect_manager.dart` (exponential backoff), `providers/conversation_helpers.dart` (getOtherUserId/User/Username).
+**Files:** `providers/chat_provider.dart`, `providers/chat_reconnect_manager.dart` (exponential backoff), `providers/conversation_helpers.dart` (getOtherUserId/User/Username/DisplayHandle).
 
 **Connect flow:** cancel reconnect -> clear ALL state -> dispose old socket + create new with `enableForceNew()` -> on connect: fetch conversations/friendRequests/friends + register 22 listeners -> delayed re-fetch 500ms if empty.
 
@@ -249,9 +252,9 @@ Loads JWT from SharedPreferences on construction. `login()`: POST -> decode -> s
 
 | Model | Key Fields | Notes |
 |---|---|---|
-| `UserModel` | id, username, profilePictureUrl? | `copyWith()` all fields |
+| `UserModel` | id, username, tag, profilePictureUrl? | `displayHandle` getter → `username#tag`; `copyWith()` all fields |
 | `ConversationModel` | id, userOne, userTwo, createdAt, disappearingTimer? | Immutable |
-| `MessageModel` | id, content, senderId, senderUsername, conversationId, deliveryStatus, messageType, mediaUrl?, mediaDuration?, expiresAt?, tempId? | `copyWith()` for deliveryStatus, expiresAt, mediaUrl, mediaDuration |
+| `MessageModel` | id, content, senderId, conversationId, deliveryStatus, messageType, mediaUrl?, mediaDuration?, expiresAt?, tempId? | `copyWith()` for deliveryStatus, expiresAt, mediaUrl, mediaDuration |
 | `FriendRequestModel` | id, sender, receiver, status, createdAt, respondedAt? | |
 
 **Frontend-only enum value:** `MessageDeliveryStatus.failed` (not in backend).
@@ -316,6 +319,18 @@ Three-layer expiration: (1) Frontend `removeExpiredMessages()` every 1s, (2) Bac
 **Ping:** One-shot notification, empty content, `messageType=PING`. Uses conversation's `disappearingTimer`.
 
 **Image messages:** POST /messages/image (JPEG/PNG, max 5MB). Creates `IMAGE` message with `mediaUrl`. Verifies friend relationship.
+
+### 8.5 Username#Tag (Discord-style)
+
+Each user has a 4-digit tag (1000–9999), random at registration. Display format: `username#tag` (e.g. `ziomek#0427`). **Username is unique** (case-insensitive) — registration throws "nickname is already taken" if username exists. Tag stays when username changes.
+
+**Add-by-username#tag flow:** User enters full handle `username#tag` (e.g. `username#1234`) -> `searchUsers` emits `{ handle }` -> backend uses `findByUsernameAndTag`, returns 0 or 1 user. Note in Add tab: "#tag is in Settings, next to your nickname. Each #tag is unique."
+
+**Display:** Settings: `username#tag` on one line (e.g. `ziomek1#1234`). Contacts: `displayHandle`. **Conversations tab and Chat header** show username only (no tag).
+
+**Login:** Use username or `username#tag`.
+
+**Migration:** Existing users get default tag `0000`. Run `backend/scripts/migrate-add-tags.ts` to assign random tags.
 
 ---
 
@@ -429,16 +444,8 @@ Frontend runs locally: `flutter run -d chrome`
 
 ## 13. Recent Changes
 
-**2026-02-18:**
-- **Email removed:** Username is now the sole user identifier (no email column). User entity, auth DTOs, JWT payload, all mappers, frontend models, and UI updated. Existing DB users must re-register.
-- `UserMapper.toPayload()` returns `{ id, username, profilePictureUrl }` (no email)
-- `MessageMapper.toPayload()` returns `senderUsername` (no `senderEmail`)
-- `AvatarCircle` param renamed from `email` to `displayName`
-- `SendFriendRequestDto`/`StartConversationDto`: `recipientEmail` → `recipientUsername`
-- Auth: `register(username, password)`, `login(username, password)` — no email anywhere
-- 27 backend tests passing, `flutter analyze` clean
-
 **2026-02-17:**
+- **Username#tag:** 4-digit tag per user (unique with username). Display `username#tag` in Settings, Contacts, ConversationTile, chat header. Add-by-username: `searchUsers` -> picker when multiple. Login by username or username#tag. SendFriendRequest/StartConversation use recipientId.
 - mediaUrl validation (Cloudinary URL regex, prevents SSRF), audit logging, Socket.IO token in auth only, Helmet middleware, RegisterDto password validation
 - Production security: JWT fails without secret in prod, strict CORS in prod, `.env.example`
 - Backend: 22 unit tests (AuthService, validateDto, mappers). `npm test`
@@ -455,7 +462,7 @@ Frontend runs locally: `flutter run -d chrome`
 ## 14. Known Limitations & Tech Debt
 
 ### Limitations
-- No user search (only add by exact username), no typing indicators, no message edit/delete, no push notifications
+- Add by username (search returns list; if multiple, picker). No fuzzy search. No typing indicators, no message edit/delete, no push notifications
 - No unique constraint on `(sender, receiver)` in friend_requests
 - Message pagination: simple limit/offset (default 50), `_conversationsWithUnread()` has N+1
 

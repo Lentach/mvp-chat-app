@@ -3,15 +3,20 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  Unique,
 } from 'typeorm';
 
 @Entity('users')
+@Unique(['username', 'tag'])
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column()
   username: string;
+
+  @Column({ length: 4, default: '0000' })
+  tag: string;
 
   // Password stored as bcrypt hash — never plain text
   @Column()

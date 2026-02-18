@@ -5,6 +5,7 @@ export class UserMapper {
     return {
       id: user.id,
       username: user.username,
+      tag: user.tag,
       profilePictureUrl: user.profilePictureUrl,
     };
   }

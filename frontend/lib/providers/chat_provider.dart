@@ -30,6 +30,7 @@ class ChatProvider extends ChangeNotifier {
   List<UserModel> _friends = [];
   bool _friendRequestJustSent = false;
   bool _showPingEffect = false;
+  List<UserModel>? _searchResults;
   final Map<int, int> _unreadCounts = {}; // conversationId -> count
 
   List<ConversationModel> get conversations => _conversations;
@@ -43,6 +44,7 @@ class ChatProvider extends ChangeNotifier {
   int get pendingRequestsCount => _pendingRequestsCount;
   List<UserModel> get friends => _friends;
   bool get friendRequestJustSent => _friendRequestJustSent;
+  List<UserModel>? get searchResults => _searchResults;
   SocketService get socket => _socketService;
 
   int? get conversationDisappearingTimer {
@@ -128,6 +130,9 @@ class ChatProvider extends ChangeNotifier {
   String getOtherUserUsername(ConversationModel conv) =>
       conv_helpers.getOtherUserUsername(conv, _currentUserId);
 
+  String getOtherUserDisplayHandle(ConversationModel conv) =>
+      conv_helpers.getOtherUserDisplayHandle(conv, _currentUserId);
+
   int getOtherUserId(ConversationModel conv) =>
       conv_helpers.getOtherUserId(conv, _currentUserId);
 
@@ -150,6 +155,7 @@ class ChatProvider extends ChangeNotifier {
     _pendingRequestsCount = 0;
     _friends = [];
     _friendRequestJustSent = false;
+    _searchResults = null;
     _errorMessage = null;
 
     // Notify listeners immediately so UI shows empty state
@@ -294,6 +300,13 @@ class ChatProvider extends ChangeNotifier {
       onChatHistoryCleared: _handleChatHistoryCleared,
       onDisappearingTimerUpdated: _handleDisappearingTimerUpdated,
       onConversationDeleted: _handleConversationDeleted,
+      onSearchUsersResult: (data) {
+        final list = data as List<dynamic>;
+        _searchResults = list
+            .map((u) => UserModel.fromJson(u as Map<String, dynamic>))
+            .toList();
+        notifyListeners();
+      },
       onDisconnect: (_) {
         _reconnect.onDisconnect(
           () => connect(token: _reconnect.tokenForReconnect!, userId: _currentUserId!),
@@ -702,16 +715,27 @@ class ChatProvider extends ChangeNotifier {
 
   // ---------- Conversation & friend actions (socket) ----------
 
-  void startConversation(String recipientUsername) {
-    _socketService.startConversation(recipientUsername);
+  void searchUsers(String handle) {
+    _searchResults = null;
+    notifyListeners();
+    _socketService.searchUsers(handle);
+  }
+
+  void clearSearchResults() {
+    _searchResults = null;
+    notifyListeners();
+  }
+
+  void startConversation(int recipientId) {
+    _socketService.startConversation(recipientId);
   }
 
   void deleteConversationOnly(int conversationId) {
     _socketService.emitDeleteConversationOnly(conversationId);
   }
 
-  void sendFriendRequest(String recipientUsername) {
-    _socketService.sendFriendRequest(recipientUsername);
+  void sendFriendRequest(int recipientId) {
+    _socketService.sendFriendRequest(recipientId);
   }
 
   void acceptFriendRequest(int requestId) {

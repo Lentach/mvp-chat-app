@@ -4,7 +4,7 @@ import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
 import '../widgets/top_snackbar.dart';
 
-/// Single screen with tabs: Add by username, Friend requests.
+/// Single screen with tabs: Add user, Friend requests.
 class AddOrInvitationsScreen extends StatelessWidget {
   const AddOrInvitationsScreen({super.key});
 
@@ -24,9 +24,44 @@ class AddOrInvitationsScreen extends StatelessWidget {
             ),
           ),
           bottom: TabBar(
-            tabs: const [
-              Tab(text: 'Add by username'),
-              Tab(text: 'Friend requests'),
+            tabs: [
+              const Tab(text: 'Add user'),
+              Tab(
+                child: Consumer<ChatProvider>(
+                  builder: (context, chat, _) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('Friend requests'),
+                      if (chat.pendingRequestsCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 18),
+                          child: Text(
+                            chat.pendingRequestsCount > 99
+                                ? '99+'
+                                : '${chat.pendingRequestsCount}',
+                            style: RpgTheme.bodyFont(
+                              fontSize: 11,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -49,58 +84,90 @@ class _AddByUsernameTab extends StatefulWidget {
 }
 
 class _AddByUsernameTabState extends State<_AddByUsernameTab> {
-  final _usernameController = TextEditingController();
+  final _handleController = TextEditingController();
   bool _loading = false;
   bool _requestSent = false;
+  bool _loadingResetScheduled = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _handleController.dispose();
     super.dispose();
   }
 
-  void _startChat() {
-    final username = _usernameController.text.trim();
-    if (username.isEmpty) return;
+  void _search() {
+    final handle = _handleController.text.trim();
+    if (handle.isEmpty) return;
 
     setState(() {
       _loading = true;
       _requestSent = false;
+      _loadingResetScheduled = false;
     });
     context.read<ChatProvider>().clearError();
-    context.read<ChatProvider>().sendFriendRequest(username);
+    context.read<ChatProvider>().clearSearchResults();
+    context.read<ChatProvider>().searchUsers(handle);
+  }
+
+  void _sendRequestTo(int recipientId, String displayHandle) {
+    context.read<ChatProvider>().sendFriendRequest(recipientId);
+    showTopSnackBar(
+      context,
+      'Friend request sent to $displayHandle',
+      backgroundColor: Colors.green,
+    );
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<ChatProvider>();
+    final searchResults = chat.searchResults;
 
-    // Listen for pending open conversation to navigate (mutual auto-accept)
     final pendingId = chat.consumePendingOpen();
     if (pendingId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(context).pop(pendingId);
-        }
+        if (mounted) Navigator.of(context).pop(pendingId);
       });
     }
 
-    // Listen for server confirmation that friend request was sent
     if (chat.consumeFriendRequestSent() && _loading && !_requestSent) {
       _requestSent = true;
       _loading = false;
-      final username = _usernameController.text.trim();
+      final displayHandle = _handleController.text.trim();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          showTopSnackBar(context, 'Friend request sent to $username', backgroundColor: Colors.green);
+          showTopSnackBar(
+            context,
+            'Friend request sent to $displayHandle',
+            backgroundColor: Colors.green,
+          );
           Navigator.pop(context);
         }
       });
     }
 
-    // Reset loading on error
-    if (chat.errorMessage != null && _loading) {
-      _loading = false;
+    final showButtonLoading =
+        _loading && chat.errorMessage == null && searchResults == null;
+
+    if ((chat.errorMessage != null || searchResults != null) &&
+        _loading &&
+        !_loadingResetScheduled) {
+      _loadingResetScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _loading = false);
+      });
+    }
+
+    // Auto-send when exactly one result
+    if (searchResults != null && searchResults.length == 1 && _loading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          final user = searchResults.first;
+          context.read<ChatProvider>().sendFriendRequest(user.id);
+          context.read<ChatProvider>().clearSearchResults();
+        }
+      });
     }
 
     return SafeArea(
@@ -109,32 +176,42 @@ class _AddByUsernameTabState extends State<_AddByUsernameTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Enter the username of the person you want to add:',
-              style: RpgTheme.bodyFont(
-                fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Text(
+                'Add new user by username#tag (e.g. username#1234). Your #tag is in Settings, next to your nickname. Each #tag is unique.',
+                style: RpgTheme.bodyFont(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: _usernameController,
+              controller: _handleController,
               style: RpgTheme.bodyFont(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
               decoration: RpgTheme.rpgInputDecoration(
-                hintText: 'username',
+                hintText: 'username#1234',
                 prefixIcon: Icons.person_outlined,
                 context: context,
               ),
               autofocus: true,
-              onSubmitted: (_) => _startChat(),
+              onSubmitted: (_) => _search(),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _loading ? null : _startChat,
-              child: _loading
+              onPressed: showButtonLoading ? null : _search,
+              child: showButtonLoading
                   ? SizedBox(
                       height: 20,
                       width: 20,
@@ -143,14 +220,27 @@ class _AddByUsernameTabState extends State<_AddByUsernameTab> {
                         color: Theme.of(context).colorScheme.primary,
                       ),
                     )
-                  : const Text('Send Friend Request'),
+                  : const Text('Add new user'),
             ),
+            if (searchResults != null && searchResults.isEmpty && !_loading) ...[
+              const SizedBox(height: 16),
+              Text(
+                'User not found',
+                style: RpgTheme.bodyFont(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
             if (chat.errorMessage != null) ...[
               const SizedBox(height: 16),
               Text(
                 chat.errorMessage!,
                 style: RpgTheme.bodyFont(
-                    fontSize: 13, color: RpgTheme.errorColor),
+                  fontSize: 13,
+                  color: RpgTheme.errorColor,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -233,7 +323,7 @@ class _FriendRequestsTabState extends State<_FriendRequestsTab> {
           itemCount: chatConsumer.friendRequests.length,
           itemBuilder: (context, index) {
             final request = chatConsumer.friendRequests[index];
-            final displayName = request.sender.username;
+            final displayName = request.sender.displayHandle;
             final firstLetter =
                 displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
 

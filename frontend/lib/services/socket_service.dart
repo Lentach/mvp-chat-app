@@ -30,6 +30,7 @@ class SocketService {
     required void Function(dynamic) onChatHistoryCleared,
     required void Function(dynamic) onDisappearingTimerUpdated,
     required void Function(dynamic) onConversationDeleted,
+    required void Function(dynamic) onSearchUsersResult,
   }) {
     // Defensive cleanup: ensure any previous socket is fully disposed
     // before creating a new one (prevents cache reuse)
@@ -71,6 +72,7 @@ class SocketService {
     _socket!.on('chatHistoryCleared', onChatHistoryCleared);
     _socket!.on('disappearingTimerUpdated', onDisappearingTimerUpdated);
     _socket!.on('conversationDeleted', onConversationDeleted);
+    _socket!.on('searchUsersResult', onSearchUsersResult);
     _socket!.onDisconnect(onDisconnect);
 
     _socket!.connect();
@@ -148,9 +150,13 @@ class SocketService {
     });
   }
 
-  void startConversation(String recipientUsername) {
+  void searchUsers(String handle) {
+    _socket?.emit('searchUsers', {'handle': handle});
+  }
+
+  void startConversation(int recipientId) {
     _socket?.emit('startConversation', {
-      'recipientUsername': recipientUsername,
+      'recipientId': recipientId,
     });
   }
 
@@ -169,9 +175,9 @@ class SocketService {
     });
   }
 
-  void sendFriendRequest(String recipientUsername) {
+  void sendFriendRequest(int recipientId) {
     _socket?.emit('sendFriendRequest', {
-      'recipientUsername': recipientUsername,
+      'recipientId': recipientId,
     });
   }
 

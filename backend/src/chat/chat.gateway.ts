@@ -84,10 +84,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      // Store user data in the socket object
       client.data.user = {
         id: user.id,
         username: user.username,
+        tag: user.tag,
       };
       this.onlineUsers.set(user.id, client.id);
 
@@ -227,6 +227,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // ========== FRIEND REQUEST HANDLERS ==========
+
+  @SubscribeMessage('searchUsers')
+  async handleSearchUsers(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    return this.chatFriendRequestService.handleSearchUsers(client, data);
+  }
 
   @SubscribeMessage('sendFriendRequest')
   async handleSendFriendRequest(

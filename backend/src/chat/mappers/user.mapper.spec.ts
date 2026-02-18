@@ -6,12 +6,14 @@ describe('UserMapper', () => {
     const user = {
       id: 1,
       username: 'alice',
+      tag: '0427',
       profilePictureUrl: 'https://example.com/avatar.png',
     } as User;
     const payload = UserMapper.toPayload(user);
     expect(payload).toEqual({
       id: 1,
       username: 'alice',
+      tag: '0427',
       profilePictureUrl: 'https://example.com/avatar.png',
     });
   });
@@ -20,12 +22,14 @@ describe('UserMapper', () => {
     const user = {
       id: 2,
       username: 'bob',
+      tag: '1234',
       profilePictureUrl: null,
     } as unknown as User;
     const payload = UserMapper.toPayload(user);
     expect(payload).toEqual({
       id: 2,
       username: 'bob',
+      tag: '1234',
       profilePictureUrl: null,
     });
   });

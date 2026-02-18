@@ -52,13 +52,17 @@ export class SendMessageDto {
 }
 
 export class SendFriendRequestDto {
+  @IsNumber()
+  @IsPositive()
+  recipientId: number;
+}
+
+export class SearchUsersDto {
   @IsString()
-  @MinLength(3, { message: 'Username must be at least 3 characters' })
-  @MaxLength(20, { message: 'Username cannot exceed 20 characters' })
-  @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: 'Username can only contain letters, numbers and underscores',
+  @Matches(/^[a-zA-Z0-9_]{3,20}#[0-9]{4}$/, {
+    message: 'Enter username#tag (e.g. username#1234)',
   })
-  recipientUsername: string;
+  handle: string; // username#tag, e.g. ziomek1#1234
 }
 
 export class AcceptFriendRequestDto {
@@ -90,13 +94,9 @@ export class GetMessagesDto {
 }
 
 export class StartConversationDto {
-  @IsString()
-  @MinLength(3, { message: 'Username must be at least 3 characters' })
-  @MaxLength(20, { message: 'Username cannot exceed 20 characters' })
-  @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: 'Username can only contain letters, numbers and underscores',
-  })
-  recipientUsername: string;
+  @IsNumber()
+  @IsPositive()
+  recipientId: number;
 }
 
 export class UnfriendDto {

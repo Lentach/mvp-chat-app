@@ -4,8 +4,8 @@ import { User } from '../../users/user.entity';
 import { Message } from '../../messages/message.entity';
 
 function createMockConversation(): Conversation {
-  const userOne = { id: 1, username: 'alice', profilePictureUrl: null } as unknown as User;
-  const userTwo = { id: 2, username: 'bob', profilePictureUrl: null } as unknown as User;
+  const userOne = { id: 1, username: 'alice', tag: '0427', profilePictureUrl: null } as unknown as User;
+  const userTwo = { id: 2, username: 'bob', tag: '1234', profilePictureUrl: null } as unknown as User;
   return {
     id: 10,
     userOne,
@@ -25,8 +25,8 @@ describe('ConversationMapper', () => {
       lastMessage: null,
       disappearingTimer: 86400,
     });
-    expect(payload.userOne).toEqual({ id: 1, username: 'alice', profilePictureUrl: null });
-    expect(payload.userTwo).toEqual({ id: 2, username: 'bob', profilePictureUrl: null });
+    expect(payload.userOne).toEqual({ id: 1, username: 'alice', tag: '0427', profilePictureUrl: null });
+    expect(payload.userTwo).toEqual({ id: 2, username: 'bob', tag: '1234', profilePictureUrl: null });
   });
 
   it('should include unreadCount and lastMessage when provided', () => {

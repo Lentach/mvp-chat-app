@@ -29,11 +29,11 @@ class ApiService {
     return data;
   }
 
-  Future<String> login(String username, String password) async {
+  Future<String> login(String identifier, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password}),
+      body: jsonEncode({'identifier': identifier, 'password': password}),
     );
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;

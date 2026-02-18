@@ -33,6 +33,7 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = UserModel(
         id: payload['sub'] as int,
         username: payload['username'] as String,
+        tag: payload['tag'] as String? ?? '0000',
         profilePictureUrl: payload['profilePictureUrl'] as String?,
       );
       notifyListeners();
@@ -54,15 +55,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(String identifier, String password) async {
     try {
-      final accessToken = await _api.login(username, password);
+      final accessToken = await _api.login(identifier, password);
       _token = accessToken;
 
       final payload = JwtDecoder.decode(accessToken);
       _currentUser = UserModel(
         id: payload['sub'] as int,
         username: payload['username'] as String,
+        tag: payload['tag'] as String? ?? '0000',
         profilePictureUrl: payload['profilePictureUrl'] as String?,
       );
 

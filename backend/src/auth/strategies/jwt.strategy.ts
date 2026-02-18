@@ -22,11 +22,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  // Passport calls this method after verifying the token signature.
-  // Returns the user object which will be available in request.user.
   async validate(payload: {
     sub: number;
     username: string;
+    tag: string;
     profilePictureUrl: string;
   }) {
     const user = await this.usersService.findById(payload.sub);
@@ -36,6 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: user.id,
       username: user.username,
+      tag: user.tag,
       profilePictureUrl: user.profilePictureUrl,
     };
   }

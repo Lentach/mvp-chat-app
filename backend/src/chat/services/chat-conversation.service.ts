@@ -41,7 +41,7 @@ export class ChatConversationService {
     }
 
     const user = await this.usersService.findById(userId);
-    const otherUser = await this.usersService.findByUsername(data.recipientUsername);
+    const otherUser = await this.usersService.findById(data.recipientId);
 
     if (!user || !otherUser) {
       client.emit('error', { message: 'User not found' });

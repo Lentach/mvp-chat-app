@@ -19,6 +19,7 @@ describe('AuthService', () => {
   const mockUser: Partial<User> = {
     id: 1,
     username: 'testuser',
+    tag: '0427',
     password: 'hashed_password',
   };
 
@@ -31,6 +32,7 @@ describe('AuthService', () => {
           useValue: {
             create: jest.fn(),
             findByUsername: jest.fn(),
+            findByUsernameAndTag: jest.fn(),
           },
         },
         {
@@ -56,7 +58,7 @@ describe('AuthService', () => {
         'testuser',
         'ValidPass1',
       );
-      expect(result).toEqual({ id: 1, username: 'testuser' });
+      expect(result).toEqual({ id: 1, username: 'testuser', tag: '0427' });
     });
 
     it('should reject password shorter than 8 chars', async () => {
@@ -93,19 +95,20 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should return access_token for valid credentials', async () => {
-      usersService.findByUsername.mockResolvedValue(mockUser as User);
+      usersService.findByUsername.mockResolvedValue([mockUser as User]);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       const result = await service.login('testuser', 'ValidPass1');
       expect(result).toEqual({ access_token: 'mock_jwt_token' });
       expect(jwtService.sign).toHaveBeenCalledWith({
         sub: 1,
         username: 'testuser',
+        tag: '0427',
         profilePictureUrl: undefined,
       });
     });
 
     it('should throw when user not found', async () => {
-      usersService.findByUsername.mockResolvedValue(null);
+      usersService.findByUsername.mockResolvedValue([]);
       await expect(service.login('unknown', 'ValidPass1')).rejects.toThrow(
         UnauthorizedException,
       );
@@ -116,7 +119,7 @@ describe('AuthService', () => {
     });
 
     it('should throw when password invalid', async () => {
-      usersService.findByUsername.mockResolvedValue(mockUser as User);
+      usersService.findByUsername.mockResolvedValue([mockUser as User]);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
       await expect(service.login('testuser', 'WrongPass1')).rejects.toThrow(
         UnauthorizedException,

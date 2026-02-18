@@ -30,35 +30,47 @@ export class UsersService {
     private cloudinaryService: CloudinaryService,
   ) {}
 
-  async create(
-    username: string,
-    password: string,
-  ): Promise<User> {
-    // Check if username is already taken (case-insensitive)
-    const existingUsername = await this.usersRepo
-      .createQueryBuilder('user')
-      .where('LOWER(user.username) = LOWER(:username)', { username })
-      .getOne();
-    if (existingUsername) {
-      throw new ConflictException('Username already in use');
+  async create(username: string, password: string): Promise<User> {
+    const existing = await this.findByUsername(username);
+    if (existing.length > 0) {
+      throw new ConflictException('nickname is already taken');
     }
-
-    // 10 bcrypt rounds — good balance of security and performance
+    // Generate random 4-digit tag (1000-9999); retry on (username, tag) collision
     const hash = await bcrypt.hash(password, 10);
-
-    const user = this.usersRepo.create({ password: hash, username });
-    return this.usersRepo.save(user);
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const tag = String(Math.floor(1000 + Math.random() * 9000));
+      const existing = await this.findByUsernameAndTag(username, tag);
+      if (!existing) {
+        const user = this.usersRepo.create({ password: hash, username, tag });
+        return this.usersRepo.save(user);
+      }
+    }
+    throw new ConflictException('Could not generate unique tag, please try again');
   }
 
   async findById(id: number): Promise<User | null> {
     return this.usersRepo.findOne({ where: { id } });
   }
 
-  async findByUsername(username: string): Promise<User | null> {
+  async findByUsername(username: string): Promise<User[]> {
     return this.usersRepo
       .createQueryBuilder('user')
       .where('LOWER(user.username) = LOWER(:username)', { username })
+      .getMany();
+  }
+
+  async findByUsernameAndTag(username: string, tag: string): Promise<User | null> {
+    return this.usersRepo
+      .createQueryBuilder('user')
+      .where('LOWER(user.username) = LOWER(:username)', { username })
+      .andWhere('user.tag = :tag', { tag })
       .getOne();
+  }
+
+  async searchByUsername(username: string, limit = 20): Promise<User[]> {
+    const users = await this.findByUsername(username);
+    return users.slice(0, limit);
   }
 
   async updateProfilePicture(

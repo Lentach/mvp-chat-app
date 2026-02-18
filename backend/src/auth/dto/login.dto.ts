@@ -3,11 +3,11 @@ import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
 export class LoginDto {
   @IsString()
   @MinLength(3)
-  @MaxLength(20)
-  @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: 'Username can only contain letters, numbers and underscores',
+  @MaxLength(25)
+  @Matches(/^[a-zA-Z0-9_]+(#[0-9]{4})?$/, {
+    message: 'Use username or username#tag (e.g. john#0427)',
   })
-  username: string;
+  identifier: string;
 
   @IsString()
   password: string;
