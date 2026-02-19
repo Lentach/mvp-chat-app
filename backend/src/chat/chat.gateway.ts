@@ -210,6 +210,42 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(recipientSocketId).emit('partnerTyping', { senderId, conversationId });
   }
 
+  @SubscribeMessage('addReaction')
+  async handleAddReaction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    return this.chatMessageService.handleAddReaction(client, data, this.server, this.onlineUsers);
+  }
+
+  @SubscribeMessage('removeReaction')
+  async handleRemoveReaction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    return this.chatMessageService.handleRemoveReaction(client, data, this.server, this.onlineUsers);
+  }
+
+  @SubscribeMessage('recordingVoice')
+  handleRecordingVoice(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ): void {
+    const senderId: number = client.data.user?.id;
+    if (!senderId) return;
+    const recipientId = typeof data?.recipientId === 'number' ? data.recipientId : null;
+    const conversationId = typeof data?.conversationId === 'number' ? data.conversationId : null;
+    const isRecording = data?.isRecording === true;
+    if (!recipientId || !conversationId) return;
+    const recipientSocketId = this.onlineUsers.get(recipientId);
+    if (!recipientSocketId) return; // offline — silent no-op
+    this.server.to(recipientSocketId).emit('partnerRecordingVoice', {
+      senderId,
+      conversationId,
+      isRecording,
+    });
+  }
+
   // ========== CONVERSATION HANDLERS ==========
 
   @SubscribeMessage('startConversation')

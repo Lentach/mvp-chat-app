@@ -33,6 +33,8 @@ class SocketService {
     required void Function(dynamic) onConversationDeleted,
     required void Function(dynamic) onSearchUsersResult,
     void Function(dynamic)? onPartnerTyping,
+    void Function(dynamic)? onPartnerRecordingVoice,
+    void Function(dynamic)? onReactionUpdated,
   }) {
     // Defensive cleanup: ensure any previous socket is fully disposed
     // before creating a new one (prevents cache reuse)
@@ -78,6 +80,12 @@ class SocketService {
     _socket!.on('searchUsersResult', onSearchUsersResult);
     if (onPartnerTyping != null) {
       _socket!.on('partnerTyping', onPartnerTyping);
+    }
+    if (onPartnerRecordingVoice != null) {
+      _socket!.on('partnerRecordingVoice', onPartnerRecordingVoice);
+    }
+    if (onReactionUpdated != null) {
+      _socket!.on('reactionUpdated', onReactionUpdated);
     }
     _socket!.onDisconnect(onDisconnect);
 
@@ -165,10 +173,26 @@ class SocketService {
     });
   }
 
+  void emitRecordingVoice(int recipientId, int conversationId, bool isRecording) {
+    _socket?.emit('recordingVoice', {
+      'recipientId': recipientId,
+      'conversationId': conversationId,
+      'isRecording': isRecording,
+    });
+  }
+
   void emitMarkConversationRead(int conversationId) {
     _socket?.emit('markConversationRead', {
       'conversationId': conversationId,
     });
+  }
+
+  void emitAddReaction(int messageId, String emoji) {
+    _socket?.emit('addReaction', {'messageId': messageId, 'emoji': emoji});
+  }
+
+  void emitRemoveReaction(int messageId, String emoji) {
+    _socket?.emit('removeReaction', {'messageId': messageId, 'emoji': emoji});
   }
 
   void searchUsers(String handle) {

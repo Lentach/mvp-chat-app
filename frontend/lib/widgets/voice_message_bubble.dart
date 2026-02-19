@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../models/message_model.dart';
 import '../theme/rpg_theme.dart';
+import 'chat_message_bubble.dart' show ReactionChipsRow;
 import 'top_snackbar.dart';
 
 class VoiceMessageBubble extends StatefulWidget {
@@ -219,6 +220,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     final chat = context.read<ChatProvider>();
     final auth = context.read<AuthProvider>();
     final isMine = widget.message.senderId == auth.currentUser?.id;
+    final currentUserId = auth.currentUser?.id;
 
     showModalBottomSheet<void>(
       context: context,
@@ -226,6 +228,38 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Emoji quick-reaction row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: ['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) {
+                  final alreadyReacted = currentUserId != null &&
+                      (widget.message.reactions[emoji]?.contains(currentUserId) ?? false);
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (alreadyReacted) {
+                        chat.removeReaction(widget.message.id, emoji);
+                      } else {
+                        chat.addReaction(widget.message.id, emoji);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: alreadyReacted
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Delete for me'),
@@ -302,12 +336,18 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     final borderColor = widget.isMine
         ? (isDark ? RpgTheme.accentDark : RpgTheme.primaryLight)
         : (isDark ? RpgTheme.borderDark : RpgTheme.primaryLight);
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
 
     return GestureDetector(
       onLongPress: _showDeleteOptions,
       child: Align(
         alignment: widget.isMine ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
+        child: Padding(
+          padding: EdgeInsets.only(top: widget.message.reactions.isNotEmpty ? 14.0 : 0.0),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+        Container(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.6,
         ),
@@ -458,7 +498,28 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
           ],
         ),
       ),
-    ),
+      if (widget.message.reactions.isNotEmpty)
+        Positioned(
+          top: -14,
+          left: widget.isMine ? null : 8,
+          right: widget.isMine ? 8 : null,
+          child: ReactionChipsRow(
+            reactions: widget.message.reactions,
+            currentUserId: currentUserId ?? -1,
+            onTap: (emoji, isMyReaction) {
+              final chat = context.read<ChatProvider>();
+              if (isMyReaction) {
+                chat.removeReaction(widget.message.id, emoji);
+              } else {
+                chat.addReaction(widget.message.id, emoji);
+              }
+            },
+          ),
+        ),
+    ],
+  ),
+),
+      ),
     );
   }
 }

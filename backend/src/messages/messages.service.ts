@@ -212,6 +212,59 @@ export class MessagesService {
     return true;
   }
 
+  async addOrUpdateReaction(
+    messageId: number,
+    userId: number,
+    emoji: string,
+  ): Promise<Message | null> {
+    const message = await this.msgRepo.findOne({
+      where: { id: messageId },
+      relations: ['sender', 'conversation'],
+    });
+    if (!message) return null;
+
+    const reactions: Record<string, number[]> = message.reactions
+      ? JSON.parse(message.reactions)
+      : {};
+
+    // Remove user's previous emoji (max 1 per user)
+    for (const key of Object.keys(reactions)) {
+      reactions[key] = reactions[key].filter((id) => id !== userId);
+      if (reactions[key].length === 0) delete reactions[key];
+    }
+
+    // Add new emoji
+    if (!reactions[emoji]) reactions[emoji] = [];
+    reactions[emoji].push(userId);
+
+    message.reactions = JSON.stringify(reactions);
+    return this.msgRepo.save(message);
+  }
+
+  async removeReaction(
+    messageId: number,
+    userId: number,
+    emoji: string,
+  ): Promise<Message | null> {
+    const message = await this.msgRepo.findOne({
+      where: { id: messageId },
+      relations: ['sender', 'conversation'],
+    });
+    if (!message) return null;
+
+    const reactions: Record<string, number[]> = message.reactions
+      ? JSON.parse(message.reactions)
+      : {};
+
+    if (reactions[emoji]) {
+      reactions[emoji] = reactions[emoji].filter((id) => id !== userId);
+      if (reactions[emoji].length === 0) delete reactions[emoji];
+    }
+
+    message.reactions = JSON.stringify(reactions);
+    return this.msgRepo.save(message);
+  }
+
   /**
    * "Delete for everyone" — hard delete the message. Only sender can call this.
    */

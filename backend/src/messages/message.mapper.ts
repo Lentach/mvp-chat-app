@@ -23,6 +23,7 @@ export class MessageMapper {
         ? new Date(message.expiresAt as Date).toISOString()
         : null,
       tempId: options?.tempId ?? null,
+      reactions: message.reactions ? JSON.parse(message.reactions) : {},
     };
   }
 }

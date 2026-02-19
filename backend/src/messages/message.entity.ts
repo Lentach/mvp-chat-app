@@ -60,6 +60,10 @@ export class Message {
   @Column({ type: 'varchar', length: 500, default: '' })
   hiddenByUserIds: string;
 
+  /** JSON: {"👍":[1,3],"❤️":[2]} — emoji reactions by userId */
+  @Column({ type: 'text', nullable: true, default: null })
+  reactions: string | null;
+
   @ManyToOne(() => User, { eager: true })
   @JoinColumn({ name: 'sender_id' })
   sender: User;

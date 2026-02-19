@@ -35,6 +35,7 @@ class ChatProvider extends ChangeNotifier {
   final Map<int, int> _unreadCounts = {}; // conversationId -> count
   final Map<int, bool> _typingStatus = {};
   final Map<int, Timer> _typingTimers = {};
+  final Map<int, bool> _partnerRecordingVoice = {}; // conversationId -> isRecording
 
   /// Ticks every second for countdown display. Bubbles use ValueListenableBuilder
   /// so only they rebuild, not the whole screen. Prevents recording timer freeze.
@@ -70,6 +71,8 @@ class ChatProvider extends ChangeNotifier {
 
   int getUnreadCount(int conversationId) => _unreadCounts[conversationId] ?? 0;
   bool isPartnerTyping(int conversationId) => _typingStatus[conversationId] ?? false;
+  bool isPartnerRecordingVoice(int conversationId) =>
+      _partnerRecordingVoice[conversationId] ?? false;
 
   /// Returns conversation by id, or null if not found.
   ConversationModel? getConversationById(int id) =>
@@ -120,12 +123,13 @@ class ChatProvider extends ChangeNotifier {
         markConversationRead(msg.conversationId);
       }
     }
-    // Clear typing indicator when message arrives
+    // Clear typing and recording indicators when message arrives
     if (_typingStatus[msg.conversationId] == true) {
       _typingTimers[msg.conversationId]?.cancel();
       _typingTimers.remove(msg.conversationId);
       _typingStatus[msg.conversationId] = false;
     }
+    _partnerRecordingVoice.remove(msg.conversationId);
     notifyListeners();
   }
 
@@ -330,6 +334,8 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners();
       },
       onPartnerTyping: _handlePartnerTyping,
+      onPartnerRecordingVoice: _handlePartnerRecordingVoice,
+      onReactionUpdated: _handleReactionUpdated,
       onDisconnect: (_) {
         _reconnect.onDisconnect(
           () => connect(token: _reconnect.tokenForReconnect!, userId: _currentUserId!),
@@ -430,6 +436,14 @@ class ChatProvider extends ChangeNotifier {
 
   void sendPing(int recipientId) {
     _socketService.sendPing(recipientId);
+  }
+
+  void addReaction(int messageId, String emoji) {
+    _socketService.emitAddReaction(messageId, emoji);
+  }
+
+  void removeReaction(int messageId, String emoji) {
+    _socketService.emitRemoveReaction(messageId, emoji);
   }
 
   void emitTyping() {
@@ -791,6 +805,33 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _handleReactionUpdated(dynamic data) {
+    final m = data as Map<String, dynamic>;
+    final messageId = m['messageId'] as int;
+    final reactionsRaw = (m['reactions'] as Map<String, dynamic>?) ?? {};
+    final reactions = reactionsRaw.map(
+      (k, v) => MapEntry(k, (v as List).map((e) => e as int).toList()),
+    );
+
+    final index = _messages.indexWhere((msg) => msg.id == messageId);
+    if (index != -1) {
+      _messages[index] = _messages[index].copyWith(reactions: reactions);
+      notifyListeners();
+    }
+  }
+
+  void _handlePartnerRecordingVoice(dynamic data) {
+    final map = data as Map<String, dynamic>;
+    final conversationId = map['conversationId'] as int;
+    final isRecording = map['isRecording'] as bool? ?? false;
+    if (isRecording) {
+      _partnerRecordingVoice[conversationId] = true;
+    } else {
+      _partnerRecordingVoice.remove(conversationId);
+    }
+    notifyListeners();
+  }
+
   // ---------- Conversation & friend actions (socket) ----------
 
   void searchUsers(String handle) {
@@ -857,6 +898,7 @@ class ChatProvider extends ChangeNotifier {
     _typingStatus.clear();
     for (final t in _typingTimers.values) { t.cancel(); }
     _typingTimers.clear();
+    _partnerRecordingVoice.clear();
     _pendingOpenConversationId = null;
     _friendRequests = [];
     _pendingRequestsCount = 0;

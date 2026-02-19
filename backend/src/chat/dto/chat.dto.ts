@@ -8,6 +8,7 @@ import {
   Min,
   Matches,
   ValidateIf,
+  IsIn,
 } from 'class-validator';
 
 /** Cloudinary URL pattern — prevents SSRF/redirect injection */
@@ -109,3 +110,25 @@ export * from './clear-chat-history.dto';
 export * from './set-disappearing-timer.dto';
 export * from './delete-conversation-only.dto';
 export * from './delete-message.dto';
+
+const ALLOWED_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
+export class AddReactionDto {
+  @IsNumber()
+  @IsPositive()
+  messageId: number;
+
+  @IsString()
+  @IsIn(ALLOWED_EMOJIS)
+  emoji: string;
+}
+
+export class RemoveReactionDto {
+  @IsNumber()
+  @IsPositive()
+  messageId: number;
+
+  @IsString()
+  @IsIn(ALLOWED_EMOJIS)
+  emoji: string;
+}

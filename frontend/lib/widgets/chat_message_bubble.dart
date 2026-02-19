@@ -57,6 +57,7 @@ class ChatMessageBubble extends StatelessWidget {
     final chat = context.read<ChatProvider>();
     final auth = context.read<AuthProvider>();
     final isMine = message.senderId == auth.currentUser?.id;
+    final currentUserId = auth.currentUser?.id;
 
     showModalBottomSheet<void>(
       context: context,
@@ -64,6 +65,38 @@ class ChatMessageBubble extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Emoji quick-reaction row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: ['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) {
+                  final alreadyReacted = currentUserId != null &&
+                      (message.reactions[emoji]?.contains(currentUserId) ?? false);
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (alreadyReacted) {
+                        chat.removeReaction(message.id, emoji);
+                      } else {
+                        chat.addReaction(message.id, emoji);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: alreadyReacted
+                            ? RpgTheme.primaryColor(context).withValues(alpha: 0.15)
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Delete for me'),
@@ -151,36 +184,43 @@ class ChatMessageBubble extends StatelessWidget {
     final timeColor =
         isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight;
 
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+
     return GestureDetector(
       onLongPress: () => _showDeleteOptions(context),
       child: Align(
         alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        margin: EdgeInsets.only(
-          left: isMine ? 48 : 0,
-          right: isMine ? 0 : 48,
-          bottom: 4,
-        ),
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMine ? 16 : 4),
-            bottomRight: Radius.circular(isMine ? 4 : 16),
+        child: Padding(
+          padding: EdgeInsets.only(top: message.reactions.isNotEmpty ? 14.0 : 0.0),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+          Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.75,
           ),
-          border: Border(
-            left: BorderSide(
-              color: borderColor,
-              width: 3,
+          margin: EdgeInsets.only(
+            left: isMine ? 48 : 0,
+            right: isMine ? 0 : 48,
+            bottom: 4,
+          ),
+          decoration: BoxDecoration(
+            color: bubbleColor,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isMine ? 16 : 4),
+              bottomRight: Radius.circular(isMine ? 4 : 16),
+            ),
+            border: Border(
+              left: BorderSide(
+                color: borderColor,
+                width: 3,
+              ),
             ),
           ),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-        child: Column(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Message content based on type
@@ -290,7 +330,70 @@ class ChatMessageBubble extends StatelessWidget {
           ],
         ),
       ),
-    ),
+      if (message.reactions.isNotEmpty)
+        Positioned(
+          top: -14,
+          left: isMine ? null : 8,
+          right: isMine ? 8 : null,
+          child: ReactionChipsRow(
+            reactions: message.reactions,
+            currentUserId: currentUserId ?? -1,
+            onTap: (emoji, isMyReaction) {
+              final chat = context.read<ChatProvider>();
+              if (isMyReaction) {
+                chat.removeReaction(message.id, emoji);
+              } else {
+                chat.addReaction(message.id, emoji);
+              }
+            },
+          ),
+        ),
+    ],
+  ),
+),
+      ),
     );
+  }
+}
+
+class ReactionChipsRow extends StatelessWidget {
+  final Map<String, List<int>> reactions;
+  final int currentUserId;
+  final void Function(String emoji, bool isMine) onTap;
+
+  const ReactionChipsRow({
+    super.key,
+    required this.reactions,
+    required this.currentUserId,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = reactions.entries
+        .where((e) => e.value.isNotEmpty)
+        .map((e) {
+          final isMine = e.value.contains(currentUserId);
+          return GestureDetector(
+            onTap: () => onTap(e.key, isMine),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isMine
+                    ? RpgTheme.primaryColor(context).withValues(alpha: 0.15)
+                    : Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isMine
+                      ? RpgTheme.primaryColor(context)
+                      : Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Text('${e.key} ${e.value.length}', style: const TextStyle(fontSize: 12)),
+            ),
+          );
+        }).toList();
+
+    return Wrap(spacing: 4, runSpacing: 2, children: chips);
   }
 }

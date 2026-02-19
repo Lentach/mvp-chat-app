@@ -27,6 +27,7 @@ class MessageModel {
   final String? mediaUrl;
   final int? mediaDuration;
   final String? tempId; // For optimistic message matching
+  final Map<String, List<int>> reactions; // emoji -> [userId]
 
   MessageModel({
     required this.id,
@@ -41,6 +42,7 @@ class MessageModel {
     this.mediaUrl,
     this.mediaDuration,
     this.tempId,
+    this.reactions = const {},
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -61,6 +63,14 @@ class MessageModel {
           ? (json['mediaDuration'] as num).round()
           : null,
       tempId: json['tempId'] as String?,
+      reactions: _parseReactions(json['reactions']),
+    );
+  }
+
+  static Map<String, List<int>> _parseReactions(dynamic raw) {
+    if (raw == null || raw is! Map) return {};
+    return raw.map(
+      (k, v) => MapEntry(k as String, (v as List).map((e) => e as int).toList()),
     );
   }
 
@@ -102,6 +112,7 @@ class MessageModel {
     DateTime? expiresAt,
     String? mediaUrl,
     int? mediaDuration,
+    Map<String, List<int>>? reactions,
   }) {
     return MessageModel(
       id: id,
@@ -116,6 +127,7 @@ class MessageModel {
       mediaUrl: mediaUrl ?? this.mediaUrl,
       mediaDuration: mediaDuration ?? this.mediaDuration,
       tempId: tempId,
+      reactions: reactions ?? this.reactions,
     );
   }
 }

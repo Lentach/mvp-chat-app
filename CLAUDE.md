@@ -104,6 +104,7 @@ erDiagram
         text mediaUrl "nullable, Cloudinary URL"
         int mediaDuration "nullable, seconds"
         varchar hiddenByUserIds "comma-separated, delete for me"
+        text reactions "nullable JSON: {emoji:[userId]}"
         timestamp expiresAt "nullable"
         timestamp createdAt
     }
@@ -140,6 +141,8 @@ Gateway verifies JWT, stores `client.data.user = { id, username, tag }`, tracks 
 | `markConversationRead` | -- | `messageDelivered` (READ) per msg |
 | `clearChatHistory` | `chatHistoryCleared` | `chatHistoryCleared` |
 | `deleteMessage` | `messageDeleted` | `messageDeleted` (for_everyone only) |
+| `addReaction` | `reactionUpdated` | `reactionUpdated` |
+| `removeReaction` | `reactionUpdated` | `reactionUpdated` |
 
 ### 3.2 Conversation Events
 
@@ -168,7 +171,7 @@ Gateway verifies JWT, stores `client.data.user = { id, username, tag }`, tracks 
 ```typescript
 { id, content, senderId, senderEmail, senderUsername, conversationId,
   createdAt, deliveryStatus, messageType, mediaUrl, mediaDuration,
-  expiresAt, tempId }
+  expiresAt, tempId, reactions }
 ```
 
 **Conversation payload** (`conversationsList` item):
@@ -452,6 +455,7 @@ Frontend runs locally: `flutter run -d chrome`
 ## 13. Recent Changes
 
 **2026-02-19:**
+- **Emoji Reactions (Messenger/Slack-style):** Long-press any message → 6 emoji picker (👍 ❤️ 😂 😮 😢 🔥) at top of modal, above delete options. Max 1 emoji per user per message (tap different = swap, tap active = remove). Floating chip overlays top edge of bubble (`Stack + Positioned top: -14`). `ReactionChipsRow` widget shared between `ChatMessageBubble` and `VoiceMessageBubble`. Backend: `messages.reactions` column (JSON text `{"👍":[1,3]}`), `addOrUpdateReaction`/`removeReaction` in MessagesService, `addReaction`/`removeReaction` WebSocket events → `reactionUpdated` to both users.
 - **Delete single message (WhatsApp/Telegram-style):** Long-press any message -> "Delete for me" / "Delete for everyone". "Delete for me" adds userId to `messages.hiddenByUserIds`; "Delete for everyone" hard-deletes (sender only). WebSocket `deleteMessage` / `messageDeleted`.
 - **#tag visibility:** Contacts tab shows username only (no tag). Settings keeps username#tag. Chat header: tap avatar to reveal username#tag for 5 seconds, with #tag in app accent color (RpgTheme.primaryColor).
 - **Typing indicators:** A types → B sees "typing..." in AppBar title and conversation list subtitle. Auto-clears after 3s of inactivity or immediately when message arrives. Backend: `typing` event relay → `partnerTyping` emit (no DB, online-only). Frontend: 300ms debounce in ChatInputBar, `_typingStatus`/`_typingTimers` maps in ChatProvider, `isPartnerTyping(convId)` getter. Timers cancelled on connect/disconnect.
