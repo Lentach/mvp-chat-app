@@ -14,6 +14,30 @@ enum MessageType {
   voice,
 }
 
+/// Preview of a message being replied to (sent in payload).
+class ReplyToPreview {
+  final int id;
+  final String content;
+  final String senderUsername;
+  final MessageType messageType;
+
+  const ReplyToPreview({
+    required this.id,
+    required this.content,
+    required this.senderUsername,
+    required this.messageType,
+  });
+
+  factory ReplyToPreview.fromJson(Map<String, dynamic> json) {
+    return ReplyToPreview(
+      id: json['id'] as int,
+      content: json['content'] as String? ?? '',
+      senderUsername: json['senderUsername'] as String? ?? '',
+      messageType: MessageModel._parseMessageType(json['messageType'] as String?),
+    );
+  }
+}
+
 class MessageModel {
   final int id;
   final String content;
@@ -28,6 +52,8 @@ class MessageModel {
   final int? mediaDuration;
   final String? tempId; // For optimistic message matching
   final Map<String, List<int>> reactions; // emoji -> [userId]
+  final int? replyToMessageId;
+  final ReplyToPreview? replyTo;
 
   MessageModel({
     required this.id,
@@ -43,6 +69,8 @@ class MessageModel {
     this.mediaDuration,
     this.tempId,
     this.reactions = const {},
+    this.replyToMessageId,
+    this.replyTo,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -64,6 +92,12 @@ class MessageModel {
           : null,
       tempId: json['tempId'] as String?,
       reactions: _parseReactions(json['reactions']),
+      replyToMessageId: json['replyToMessageId'] != null
+          ? (json['replyToMessageId'] as num).toInt()
+          : null,
+      replyTo: json['replyTo'] != null
+          ? ReplyToPreview.fromJson(json['replyTo'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -92,6 +126,8 @@ class MessageModel {
     }
   }
 
+  static MessageType parseMessageType(String? type) => _parseMessageType(type);
+
   static MessageType _parseMessageType(String? type) {
     switch (type?.toUpperCase()) {
       case 'PING':
@@ -113,6 +149,8 @@ class MessageModel {
     String? mediaUrl,
     int? mediaDuration,
     Map<String, List<int>>? reactions,
+    int? replyToMessageId,
+    ReplyToPreview? replyTo,
   }) {
     return MessageModel(
       id: id,
@@ -128,6 +166,8 @@ class MessageModel {
       mediaDuration: mediaDuration ?? this.mediaDuration,
       tempId: tempId,
       reactions: reactions ?? this.reactions,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      replyTo: replyTo ?? this.replyTo,
     );
   }
 }

@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../models/message_model.dart';
 import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
 import 'chat_action_tiles.dart';
@@ -25,6 +26,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   bool _hasText = false;
+  MessageModel? _lastReplyingTo;
   bool _showActionPanel = false;
   late final AnimationController _actionPanelController;
   late final Animation<double> _actionPanelAnimation;
@@ -164,6 +166,14 @@ class _ChatInputBarState extends State<ChatInputBar>
       final chat = context.read<ChatProvider>();
       chat.isRecordingVoice = true;
       chat.notifyListeners();
+      final convId = chat.activeConversationId;
+      if (convId != null) {
+        final conv = chat.getConversationById(convId);
+        if (conv != null) {
+          final recipientId = chat.getOtherUserId(conv);
+          chat.socket.emitRecordingVoice(recipientId, convId, true);
+        }
+      }
       setState(() {
         _isRecording = true;
         _cancelDragOffset = 0.0;
@@ -191,6 +201,14 @@ class _ChatInputBarState extends State<ChatInputBar>
     final chat = context.read<ChatProvider>();
     chat.isRecordingVoice = false;
     chat.notifyListeners();
+    final convId = chat.activeConversationId;
+    if (convId != null) {
+      final conv = chat.getConversationById(convId);
+      if (conv != null) {
+        final recipientId = chat.getOtherUserId(conv);
+        chat.socket.emitRecordingVoice(recipientId, convId, false);
+      }
+    }
     _recordingTimer?.cancel();
     _recordingTimer = null;
 
@@ -372,6 +390,79 @@ class _ChatInputBarState extends State<ChatInputBar>
     return '$minutes:${secs.toString().padLeft(2, '0')}';
   }
 
+  String _replyPreviewContent(MessageModel msg) {
+    switch (msg.messageType) {
+      case MessageType.voice:
+        return 'Voice message';
+      case MessageType.image:
+      case MessageType.drawing:
+        return 'Image';
+      case MessageType.ping:
+        return 'Ping';
+      default:
+        return msg.content.length > 80
+            ? '${msg.content.substring(0, 80)}...'
+            : msg.content;
+    }
+  }
+
+  Widget _buildReplyPreview(BuildContext context, ChatProvider chat) {
+    final msg = chat.replyingToMessage;
+    if (msg == null) return const SizedBox.shrink();
+
+    final isDark = RpgTheme.isDark(context);
+    final borderColor = isDark ? RpgTheme.accentDark : RpgTheme.primaryLight;
+    final mutedColor = isDark ? Colors.white60 : Colors.black54;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+        border: Border(
+          left: BorderSide(color: borderColor, width: 4),
+          bottom: BorderSide(
+            color: isDark ? RpgTheme.tabBorderDark : RpgTheme.tabBorderLight,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  msg.senderUsername.isNotEmpty ? msg.senderUsername : 'Unknown',
+                  style: RpgTheme.bodyFont(
+                    fontSize: 12,
+                    color: borderColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _replyPreviewContent(msg),
+                  style: RpgTheme.bodyFont(fontSize: 12, color: mutedColor),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            onPressed: () => chat.clearReplyingTo(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            color: mutedColor,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRecordingBar(BuildContext context) {
     final isDark = RpgTheme.isDark(context);
     final tabBorderColor = isDark ? RpgTheme.tabBorderDark : RpgTheme.tabBorderLight;
@@ -464,6 +555,17 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<ChatProvider>();
+    final replyingTo = chat.replyingToMessage;
+    if (replyingTo != null && _lastReplyingTo != replyingTo) {
+      _lastReplyingTo = replyingTo;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _focusNode.canRequestFocus) {
+          _focusNode.requestFocus();
+        }
+      });
+    } else if (replyingTo == null) {
+      _lastReplyingTo = null;
+    }
     final activeTimer = chat.conversationDisappearingTimer;
     final isDark = RpgTheme.isDark(context);
     final colorScheme = Theme.of(context).colorScheme;
@@ -478,6 +580,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Reply preview
+          if (chat.replyingToMessage != null)
+            _buildReplyPreview(context, chat),
           // Active timer indicator
           if (activeTimer != null)
             Container(

@@ -275,6 +275,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   String? _getHeaderStatusText(ChatProvider chat) {
     if (chat.isRecordingVoice) return 'Recording voice...';
+    if (chat.isPartnerRecordingVoice(widget.conversationId)) return 'Recording voice...';
     if (chat.isPartnerTyping(widget.conversationId)) return 'typing...';
     return null;
   }

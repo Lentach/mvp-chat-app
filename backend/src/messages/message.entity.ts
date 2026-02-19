@@ -64,6 +64,14 @@ export class Message {
   @Column({ type: 'text', nullable: true, default: null })
   reactions: string | null;
 
+  /** ID of the message being replied to (same conversation). */
+  @Column({ type: 'int', nullable: true })
+  replyToMessageId: number | null;
+
+  @ManyToOne(() => Message, { nullable: true, eager: false })
+  @JoinColumn({ name: 'reply_to_message_id' })
+  replyTo: Message | null;
+
   @ManyToOne(() => User, { eager: true })
   @JoinColumn({ name: 'sender_id' })
   sender: User;

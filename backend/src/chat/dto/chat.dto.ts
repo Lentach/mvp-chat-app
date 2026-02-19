@@ -50,6 +50,11 @@ export class SendMessageDto {
   @IsNumber()
   @IsPositive()
   mediaDuration?: number; // duration in seconds
+
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  replyToMessageId?: number; // ID of the message being replied to
 }
 
 export class SendFriendRequestDto {

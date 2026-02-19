@@ -45,6 +45,23 @@ class ChatProvider extends ChangeNotifier {
   /// starving the recording timer callback (progressive freeze).
   bool isRecordingVoice = false;
 
+  /// Message being replied to (set when user taps Reply in bubble bottom sheet).
+  MessageModel? _replyingToMessage;
+
+  MessageModel? get replyingToMessage => _replyingToMessage;
+
+  void setReplyingTo(MessageModel? msg) {
+    _replyingToMessage = msg;
+    notifyListeners();
+  }
+
+  void clearReplyingTo() {
+    if (_replyingToMessage != null) {
+      _replyingToMessage = null;
+      notifyListeners();
+    }
+  }
+
   List<ConversationModel> get conversations => _conversations;
   List<MessageModel> get messages => _messages;
   int? get activeConversationId => _activeConversationId;
@@ -175,6 +192,8 @@ class ChatProvider extends ChangeNotifier {
     _typingStatus.clear();
     for (final t in _typingTimers.values) { t.cancel(); }
     _typingTimers.clear();
+    _partnerRecordingVoice.clear();
+    _replyingToMessage = null;
     _pendingOpenConversationId = null;
     _friendRequests = [];
     _pendingRequestsCount = 0;
@@ -391,7 +410,7 @@ class ChatProvider extends ChangeNotifier {
 
   // ---------- Send message / voice / image ----------
 
-  void sendMessage(String content, {int? expiresIn}) {
+  void sendMessage(String content, {int? expiresIn, int? replyToMessageId}) {
     if (_activeConversationId == null || _currentUserId == null) return;
 
     final conv = _conversations.firstWhere(
@@ -404,9 +423,31 @@ class ChatProvider extends ChangeNotifier {
 
     // Use conversation disappearing timer if expiresIn not provided
     final effectiveExpiresIn = expiresIn ?? conversationDisappearingTimer;
+    final effectiveReplyToId = replyToMessageId ?? _replyingToMessage?.id;
 
     // Generate unique tempId for optimistic message matching
     final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}_$_currentUserId';
+
+    ReplyToPreview? replyPreview;
+    if (_replyingToMessage != null) {
+      final rt = _replyingToMessage!;
+      final contentPreview = rt.messageType == MessageType.voice
+          ? 'Voice message'
+          : rt.messageType == MessageType.image ||
+                  rt.messageType == MessageType.drawing
+              ? 'Image'
+              : rt.messageType == MessageType.ping
+                  ? 'Ping'
+                  : rt.content.length > 150
+                      ? '${rt.content.substring(0, 150)}...'
+                      : rt.content;
+      replyPreview = ReplyToPreview(
+        id: rt.id,
+        content: contentPreview,
+        senderUsername: rt.senderUsername,
+        messageType: rt.messageType,
+      );
+    }
 
     // Create optimistic message with SENDING status
     final tempMessage = MessageModel(
@@ -421,9 +462,14 @@ class ChatProvider extends ChangeNotifier {
           ? DateTime.now().add(Duration(seconds: effectiveExpiresIn))
           : null,
       tempId: tempId,
+      replyToMessageId: effectiveReplyToId,
+      replyTo: replyPreview,
     );
 
     _messages.add(tempMessage);
+    if (_replyingToMessage != null) {
+      _replyingToMessage = null;
+    }
     notifyListeners();
 
     _socketService.sendMessage(
@@ -431,6 +477,7 @@ class ChatProvider extends ChangeNotifier {
       content,
       expiresIn: effectiveExpiresIn,
       tempId: tempId,
+      replyToMessageId: effectiveReplyToId,
     );
   }
 
@@ -899,6 +946,7 @@ class ChatProvider extends ChangeNotifier {
     for (final t in _typingTimers.values) { t.cancel(); }
     _typingTimers.clear();
     _partnerRecordingVoice.clear();
+    _replyingToMessage = null;
     _pendingOpenConversationId = null;
     _friendRequests = [];
     _pendingRequestsCount = 0;

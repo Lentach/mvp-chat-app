@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import '../models/message_model.dart';
 import '../theme/rpg_theme.dart';
 import 'chat_message_bubble.dart' show ReactionChipsRow;
+import 'message_swipe_wrapper.dart';
 import 'top_snackbar.dart';
 
 class VoiceMessageBubble extends StatefulWidget {
@@ -216,11 +217,51 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
-  void _showDeleteOptions() {
+  void _showReactionOptions() {
+    final chat = context.read<ChatProvider>();
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: ['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) {
+              final alreadyReacted = currentUserId != null &&
+                  (widget.message.reactions[emoji]?.contains(currentUserId) ?? false);
+              return GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  if (alreadyReacted) {
+                    chat.removeReaction(widget.message.id, emoji);
+                  } else {
+                    chat.addReaction(widget.message.id, emoji);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: alreadyReacted
+                        ? RpgTheme.primaryColor(context).withValues(alpha: 0.15)
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation() {
     final chat = context.read<ChatProvider>();
     final auth = context.read<AuthProvider>();
-    final isMine = widget.message.senderId == auth.currentUser?.id;
-    final currentUserId = auth.currentUser?.id;
+    final isMineMsg = widget.message.senderId == auth.currentUser?.id;
 
     showModalBottomSheet<void>(
       context: context,
@@ -228,38 +269,6 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Emoji quick-reaction row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: ['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) {
-                  final alreadyReacted = currentUserId != null &&
-                      (widget.message.reactions[emoji]?.contains(currentUserId) ?? false);
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      if (alreadyReacted) {
-                        chat.removeReaction(widget.message.id, emoji);
-                      } else {
-                        chat.addReaction(widget.message.id, emoji);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: alreadyReacted
-                            ? Theme.of(context).colorScheme.primaryContainer
-                            : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(emoji, style: const TextStyle(fontSize: 24)),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Delete for me'),
@@ -268,7 +277,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
                 chat.deleteMessage(widget.message.id, forEveryone: false);
               },
             ),
-            if (isMine)
+            if (isMineMsg)
               ListTile(
                 leading: const Icon(Icons.delete_forever),
                 title: const Text('Delete for everyone'),
@@ -279,6 +288,63 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReplyQuote(
+    BuildContext context,
+    ReplyToPreview replyTo,
+    bool isDark,
+    Color borderColor,
+  ) {
+    final mutedColor = isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight;
+    String content = replyTo.content;
+    if (content.isEmpty) {
+      switch (replyTo.messageType) {
+        case MessageType.voice:
+          content = 'Voice message';
+          break;
+        case MessageType.image:
+        case MessageType.drawing:
+          content = 'Image';
+          break;
+        case MessageType.ping:
+          content = 'Ping';
+          break;
+        default:
+          content = '';
+      }
+    }
+    return Container(
+      padding: const EdgeInsets.only(left: 10, top: 6, bottom: 6, right: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: borderColor, width: 3)),
+        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            replyTo.senderUsername.isNotEmpty ? replyTo.senderUsername : 'Unknown',
+            style: RpgTheme.bodyFont(
+              fontSize: 12,
+              color: borderColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (content.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              content,
+              style: RpgTheme.bodyFont(fontSize: 12, color: mutedColor),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -337,9 +403,13 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         ? (isDark ? RpgTheme.accentDark : RpgTheme.primaryLight)
         : (isDark ? RpgTheme.borderDark : RpgTheme.primaryLight);
     final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    final chat = context.read<ChatProvider>();
 
-    return GestureDetector(
-      onLongPress: _showDeleteOptions,
+    return MessageSwipeWrapper(
+      isMine: widget.isMine,
+      onSwipeReply: () => chat.setReplyingTo(widget.message),
+      onSwipeDelete: _showDeleteConfirmation,
+      onLongPress: _showReactionOptions,
       child: Align(
         alignment: widget.isMine ? Alignment.centerRight : Alignment.centerLeft,
         child: Padding(
@@ -367,6 +437,10 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.message.replyTo != null) ...[
+              _buildReplyQuote(context, widget.message.replyTo!, isDark, borderColor),
+              const SizedBox(height: 8),
+            ],
             // Playback controls row
             Row(
               children: [

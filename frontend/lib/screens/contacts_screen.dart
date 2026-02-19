@@ -133,9 +133,24 @@ class ContactsScreen extends StatelessWidget {
     );
   }
 
+  /// Natural sort: same prefix → smaller number first (ziomek3, ziomek6, ziomek50).
+  static int _compareByDisplayName(UserModel a, UserModel b) {
+    final aMatch = RegExp(r'^(.+?)(\d+)$').firstMatch(a.username);
+    final bMatch = RegExp(r'^(.+?)(\d+)$').firstMatch(b.username);
+    final aPrefix = (aMatch?.group(1) ?? a.username).toLowerCase();
+    final bPrefix = (bMatch?.group(1) ?? b.username).toLowerCase();
+    final aNum = aMatch != null ? int.tryParse(aMatch.group(2)!) ?? 0 : 0;
+    final bNum = bMatch != null ? int.tryParse(bMatch.group(2)!) ?? 0 : 0;
+
+    final prefixCmp = aPrefix.compareTo(bPrefix);
+    if (prefixCmp != 0) return prefixCmp;
+    return aNum.compareTo(bNum);
+  }
+
   Widget _buildContactsList(BuildContext context) {
     final chat = context.watch<ChatProvider>();
-    final friends = chat.friends;
+    final friends = List<UserModel>.from(chat.friends)
+      ..sort(_compareByDisplayName);
     final isDark = RpgTheme.isDark(context);
     final mutedColor =
         isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;

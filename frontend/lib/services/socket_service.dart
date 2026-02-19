@@ -104,8 +104,9 @@ class SocketService {
     int? mediaDuration,
     int? expiresIn,
     String? tempId,
+    int? replyToMessageId,
   }) {
-    final payload = {
+    final payload = <String, dynamic>{
       'recipientId': recipientId,
       'content': content,
     };
@@ -123,6 +124,9 @@ class SocketService {
     }
     if (tempId != null) {
       payload['tempId'] = tempId;
+    }
+    if (replyToMessageId != null) {
+      payload['replyToMessageId'] = replyToMessageId;
     }
     _socket?.emit('sendMessage', payload);
   }

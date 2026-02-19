@@ -74,6 +74,7 @@ export class ChatMessageService {
         messageType: data.messageType,
         mediaUrl: data.mediaUrl,
         mediaDuration: data.mediaDuration,
+        replyToMessageId: data.replyToMessageId ?? null,
       },
     );
 

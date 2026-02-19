@@ -4,6 +4,7 @@ import '../theme/rpg_theme.dart';
 import '../models/message_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
+import 'message_swipe_wrapper.dart';
 import 'voice_message_bubble.dart';
 
 class ChatMessageBubble extends StatelessWidget {
@@ -18,6 +19,59 @@ class ChatMessageBubble extends StatelessWidget {
 
   String _formatTime(DateTime dt) {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildReplyQuote(
+    BuildContext context,
+    ReplyToPreview replyTo,
+    bool isDark,
+    Color textColor,
+    Color borderColor,
+  ) {
+    final mutedColor = isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight;
+    return Container(
+      padding: const EdgeInsets.only(left: 10, top: 6, bottom: 6, right: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: borderColor, width: 3)),
+        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            replyTo.senderUsername.isNotEmpty ? replyTo.senderUsername : 'Unknown',
+            style: RpgTheme.bodyFont(
+              fontSize: 12,
+              color: borderColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            replyTo.content.isNotEmpty ? replyTo.content : _replyTypeLabel(replyTo.messageType),
+            style: RpgTheme.bodyFont(fontSize: 12, color: mutedColor),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _replyTypeLabel(MessageType type) {
+    switch (type) {
+      case MessageType.voice:
+        return 'Voice message';
+      case MessageType.image:
+      case MessageType.drawing:
+        return 'Image';
+      case MessageType.ping:
+        return 'Ping';
+      default:
+        return '';
+    }
   }
 
   /// One check = delivered (reached recipient device). Two checks = read (recipient opened/read).
@@ -53,11 +107,51 @@ class ChatMessageBubble extends StatelessWidget {
     return Icon(icon, size: 12, color: color);
   }
 
-  void _showDeleteOptions(BuildContext context) {
+  void _showReactionOptions(BuildContext context) {
+    final chat = context.read<ChatProvider>();
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: ['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) {
+              final alreadyReacted = currentUserId != null &&
+                  (message.reactions[emoji]?.contains(currentUserId) ?? false);
+              return GestureDetector(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  if (alreadyReacted) {
+                    chat.removeReaction(message.id, emoji);
+                  } else {
+                    chat.addReaction(message.id, emoji);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: alreadyReacted
+                        ? RpgTheme.primaryColor(context).withValues(alpha: 0.15)
+                        : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
     final chat = context.read<ChatProvider>();
     final auth = context.read<AuthProvider>();
-    final isMine = message.senderId == auth.currentUser?.id;
-    final currentUserId = auth.currentUser?.id;
+    final isMineMsg = message.senderId == auth.currentUser?.id;
 
     showModalBottomSheet<void>(
       context: context,
@@ -65,38 +159,6 @@ class ChatMessageBubble extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Emoji quick-reaction row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: ['👍', '❤️', '😂', '😮', '😢', '🔥'].map((emoji) {
-                  final alreadyReacted = currentUserId != null &&
-                      (message.reactions[emoji]?.contains(currentUserId) ?? false);
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      if (alreadyReacted) {
-                        chat.removeReaction(message.id, emoji);
-                      } else {
-                        chat.addReaction(message.id, emoji);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: alreadyReacted
-                            ? RpgTheme.primaryColor(context).withValues(alpha: 0.15)
-                            : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(emoji, style: const TextStyle(fontSize: 24)),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Delete for me'),
@@ -105,7 +167,7 @@ class ChatMessageBubble extends StatelessWidget {
                 chat.deleteMessage(message.id, forEveryone: false);
               },
             ),
-            if (isMine)
+            if (isMineMsg)
               ListTile(
                 leading: const Icon(Icons.delete_forever),
                 title: const Text('Delete for everyone'),
@@ -185,9 +247,13 @@ class ChatMessageBubble extends StatelessWidget {
         isDark ? RpgTheme.timeColorDark : RpgTheme.textSecondaryLight;
 
     final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    final chat = context.read<ChatProvider>();
 
-    return GestureDetector(
-      onLongPress: () => _showDeleteOptions(context),
+    return MessageSwipeWrapper(
+      isMine: isMine,
+      onSwipeReply: () => chat.setReplyingTo(message),
+      onSwipeDelete: () => _showDeleteConfirmation(context),
+      onLongPress: () => _showReactionOptions(context),
       child: Align(
         alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
         child: Padding(
@@ -223,6 +289,10 @@ class ChatMessageBubble extends StatelessWidget {
           child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (message.replyTo != null) ...[
+              _buildReplyQuote(context, message.replyTo!, isDark, textColor, borderColor),
+              const SizedBox(height: 8),
+            ],
             // Message content based on type
             if (message.messageType == MessageType.text)
               Text(

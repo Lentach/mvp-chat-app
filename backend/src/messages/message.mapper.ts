@@ -8,7 +8,7 @@ export class MessageMapper {
     const sender = message.sender;
     const convId =
       options?.conversationId ?? message.conversation?.id ?? null;
-    return {
+    const payload: Record<string, unknown> = {
       id: message.id,
       content: message.content,
       senderId: sender?.id,
@@ -25,5 +25,27 @@ export class MessageMapper {
       tempId: options?.tempId ?? null,
       reactions: message.reactions ? JSON.parse(message.reactions) : {},
     };
+
+    if (message.replyTo) {
+      const rt = message.replyTo;
+      const contentPreview =
+        rt.content && rt.messageType === 'TEXT'
+          ? rt.content.substring(0, 150)
+          : rt.messageType === 'VOICE'
+            ? 'Voice message'
+            : rt.messageType === 'IMAGE' || rt.messageType === 'DRAWING'
+              ? 'Image'
+              : rt.messageType === 'PING'
+                ? 'Ping'
+                : '';
+      payload.replyTo = {
+        id: rt.id,
+        content: contentPreview,
+        senderUsername: rt.sender?.username ?? '',
+        messageType: rt.messageType,
+      };
+    }
+
+    return payload;
   }
 }

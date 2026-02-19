@@ -22,8 +22,20 @@ export class MessagesService {
       messageType?: MessageType;
       mediaUrl?: string | null;
       mediaDuration?: number | null;
+      replyToMessageId?: number | null;
     },
   ): Promise<Message> {
+    let replyTo: Message | null = null;
+    if (options?.replyToMessageId != null) {
+      const replyToMsg = await this.msgRepo.findOne({
+        where: { id: options.replyToMessageId, conversation: { id: conversation.id } },
+        relations: ['sender'],
+      });
+      if (replyToMsg) {
+        replyTo = replyToMsg;
+      }
+    }
+
     const msg = this.msgRepo.create({
       content,
       sender,
@@ -33,8 +45,14 @@ export class MessagesService {
       messageType: options?.messageType || MessageType.TEXT,
       mediaUrl: options?.mediaUrl || null,
       mediaDuration: options?.mediaDuration || null,
+      replyTo,
     });
-    return this.msgRepo.save(msg);
+    const saved = await this.msgRepo.save(msg);
+    if (replyTo) {
+      saved.replyTo = replyTo;
+      return saved;
+    }
+    return saved;
   }
 
   /** Parse hiddenByUserIds string "1,2,3" to number[] */
@@ -59,7 +77,7 @@ export class MessagesService {
     const fetchLimit = hiddenByUserId != null ? limit * 3 + offset : limit + offset;
     const messages = await this.msgRepo.find({
       where: { conversation: { id: conversationId } },
-      relations: ['sender'],
+      relations: ['sender', 'replyTo', 'replyTo.sender'],
       order: { createdAt: 'DESC' },
       take: Math.min(fetchLimit, 500),
       skip: 0,
