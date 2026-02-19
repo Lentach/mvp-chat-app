@@ -103,6 +103,7 @@ erDiagram
         enum messageType "TEXT|PING|IMAGE|DRAWING|VOICE"
         text mediaUrl "nullable, Cloudinary URL"
         int mediaDuration "nullable, seconds"
+        varchar hiddenByUserIds "comma-separated, delete for me"
         timestamp expiresAt "nullable"
         timestamp createdAt
     }
@@ -138,6 +139,7 @@ Gateway verifies JWT, stores `client.data.user = { id, username, tag }`, tracks 
 | `messageDelivered` | -- | `messageDelivered` (to sender) |
 | `markConversationRead` | -- | `messageDelivered` (READ) per msg |
 | `clearChatHistory` | `chatHistoryCleared` | `chatHistoryCleared` |
+| `deleteMessage` | `messageDeleted` | `messageDeleted` (for_everyone only) |
 
 ### 3.2 Conversation Events
 
@@ -189,6 +191,7 @@ Gateway verifies JWT, stores `client.data.user = { id, username, tag }`, tracks 
 | `StartConversationDto` | recipientId (int+) | |
 | `UnfriendDto` | userId (int+) | |
 | `ClearChatHistoryDto` / `SetDisappearingTimerDto` / `DeleteConversationOnlyDto` / `SendPingDto` | conversationId or recipientId (int+) | separate files |
+| `DeleteMessageDto` | messageId (int+), mode ('for_me' \| 'for_everyone') | separate file |
 
 ---
 
@@ -222,7 +225,7 @@ Gateway verifies JWT, stores `client.data.user = { id, username, tag }`, tracks 
 
 **Key screens:** AuthScreen (login by username or username#tag, `clearStatus()` on tab switch — DO NOT DELETE), ConversationsScreen (swipe-to-delete, `consumePendingOpen()` pattern), ChatDetailScreen (Timer.periodic 1s for `removeExpiredMessages()`, `markConversationRead` on open), AddOrInvitationsScreen (searchUsers -> 1 result auto-send, multiple results picker, `consumeFriendRequestSent()` pattern).
 
-**Key widgets:** ChatInputBar (text+send+mic hold-to-record+action tiles), ChatActionTiles (Camera/Gallery/Ping/Timer/Clear/Drawing), ChatMessageBubble (TEXT/PING/IMAGE/DRAWING/VOICE), VoiceMessageBubble (scrubbable waveform, speed toggle 1x/1.5x/2x), ConversationTile (Dismissible swipe-to-delete, unread badge), TopSnackbar (all notifications — never use ScaffoldMessenger), AvatarCircle (stable cache-bust per profilePictureUrl).
+**Key widgets:** ChatInputBar (text+send+mic hold-to-record+action tiles), ChatActionTiles (Camera/Gallery/Ping/Timer/Clear/Drawing), ChatMessageBubble (TEXT/PING/IMAGE/DRAWING/VOICE, long-press -> delete for me/everyone), VoiceMessageBubble (scrubbable waveform, speed toggle 1x/1.5x/2x, long-press -> delete), ConversationTile (Dismissible swipe-to-delete, unread badge), TopSnackbar (all notifications — never use ScaffoldMessenger), AvatarCircle (stable cache-bust per profilePictureUrl).
 
 ---
 
@@ -304,13 +307,17 @@ Three-layer expiration: (1) Frontend `removeExpiredMessages()` every 1s, (2) Bac
 
 **Platform:** `permission_handler` on mobile only (`!kIsWeb`). mediaUrl validated as Cloudinary URL (prevents SSRF).
 
-### 8.3 Delete Conversation vs Unfriend vs Clear History
+### 8.3 Delete Conversation vs Unfriend vs Clear History vs Delete Message
 
 | Action | What's Deleted | Friend Preserved? | Event |
 |---|---|---|---|
 | Delete Conversation (swipe) | Messages + Conversation | Yes | `deleteConversationOnly` |
 | Unfriend (long-press contacts) | FriendRequest + Conversation + Messages | No | `unfriend` |
 | Clear History (action tile) | Messages only | Yes (conv too) | `clearChatHistory` |
+| Delete for me (long-press msg) | Hidden for current user only | Yes | `deleteMessage` mode=for_me |
+| Delete for everyone (long-press own msg) | Message hard-deleted for both | Yes | `deleteMessage` mode=for_everyone |
+
+**Delete single message (WhatsApp/Telegram-style):** Long-press any message -> modal with "Delete for me" / "Delete for everyone". "Delete for me" adds userId to `hiddenByUserIds` (message stays in DB, hidden from that user). "Delete for everyone" — hard delete, **sender only**, emits `messageDeleted` to both. `getMessages` / `getLastMessage` / `countUnreadForRecipient` filter by hiddenByUserIds.
 
 ### 8.4 Other Features
 
@@ -346,7 +353,7 @@ Each user has a 4-digit tag (1000–9999), random at registration. Display forma
 | **Messages** | `messages/message.entity.ts`, `messages/message.mapper.ts`, `messages/messages.service.ts`, `messages/messages.controller.ts` |
 | **Friends** | `friends/friend-request.entity.ts`, `friends/friends.service.ts` |
 | **Chat** | `chat/chat.gateway.ts`, `chat/services/chat-{message,conversation,friend-request}.service.ts` |
-| **DTOs** | `chat/dto/chat.dto.ts` (main), `chat/dto/{send-ping,clear-chat-history,set-disappearing-timer,delete-conversation-only}.dto.ts` |
+| **DTOs** | `chat/dto/chat.dto.ts` (main), `chat/dto/{send-ping,clear-chat-history,set-disappearing-timer,delete-conversation-only,delete-message}.dto.ts` |
 | **Mappers** | `chat/mappers/{conversation,user,friend-request}.mapper.ts`, `messages/message.mapper.ts` |
 | **Utils/Config** | `chat/utils/dto.validator.ts`, `cloudinary/cloudinary.service.ts`, `app.module.ts` |
 
@@ -445,7 +452,9 @@ Frontend runs locally: `flutter run -d chrome`
 ## 13. Recent Changes
 
 **2026-02-19:**
+- **Delete single message (WhatsApp/Telegram-style):** Long-press any message -> "Delete for me" / "Delete for everyone". "Delete for me" adds userId to `messages.hiddenByUserIds`; "Delete for everyone" hard-deletes (sender only). WebSocket `deleteMessage` / `messageDeleted`.
 - **#tag visibility:** Contacts tab shows username only (no tag). Settings keeps username#tag. Chat header: tap avatar to reveal username#tag for 5 seconds, with #tag in app accent color (RpgTheme.primaryColor).
+- **Typing indicators:** A types → B sees "typing..." in AppBar title and conversation list subtitle. Auto-clears after 3s of inactivity or immediately when message arrives. Backend: `typing` event relay → `partnerTyping` emit (no DB, online-only). Frontend: 300ms debounce in ChatInputBar, `_typingStatus`/`_typingTimers` maps in ChatProvider, `isPartnerTyping(convId)` getter. Timers cancelled on connect/disconnect.
 
 **2026-02-17:**
 - **Username#tag:** 4-digit tag per user (unique with username). Display `username#tag` in Settings, Contacts, ConversationTile, chat header. Add-by-username: `searchUsers` -> picker when multiple. Login by username or username#tag. SendFriendRequest/StartConversation use recipientId.

@@ -180,6 +180,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  @SubscribeMessage('deleteMessage')
+  handleDeleteMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    return this.chatMessageService.handleDeleteMessage(
+      client,
+      data,
+      this.server,
+      this.onlineUsers,
+    );
+  }
+
+  // ========== TYPING INDICATOR ==========
+
+  @SubscribeMessage('typing')
+  handleTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ): void {
+    const senderId: number = client.data.user?.id;
+    if (!senderId) return;
+    const recipientId = typeof data?.recipientId === 'number' ? data.recipientId : null;
+    const conversationId = typeof data?.conversationId === 'number' ? data.conversationId : null;
+    if (!recipientId || !conversationId) return;
+    const recipientSocketId = this.onlineUsers.get(recipientId);
+    if (!recipientSocketId) return; // offline — silent no-op
+    this.server.to(recipientSocketId).emit('partnerTyping', { senderId, conversationId });
+  }
+
   // ========== CONVERSATION HANDLERS ==========
 
   @SubscribeMessage('startConversation')

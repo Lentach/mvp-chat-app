@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -32,6 +33,8 @@ class ChatProvider extends ChangeNotifier {
   bool _showPingEffect = false;
   List<UserModel>? _searchResults;
   final Map<int, int> _unreadCounts = {}; // conversationId -> count
+  final Map<int, bool> _typingStatus = {};
+  final Map<int, Timer> _typingTimers = {};
 
   /// Ticks every second for countdown display. Bubbles use ValueListenableBuilder
   /// so only they rebuild, not the whole screen. Prevents recording timer freeze.
@@ -66,6 +69,7 @@ class ChatProvider extends ChangeNotifier {
   bool get showPingEffect => _showPingEffect;
 
   int getUnreadCount(int conversationId) => _unreadCounts[conversationId] ?? 0;
+  bool isPartnerTyping(int conversationId) => _typingStatus[conversationId] ?? false;
 
   /// Returns conversation by id, or null if not found.
   ConversationModel? getConversationById(int id) =>
@@ -116,6 +120,12 @@ class ChatProvider extends ChangeNotifier {
         markConversationRead(msg.conversationId);
       }
     }
+    // Clear typing indicator when message arrives
+    if (_typingStatus[msg.conversationId] == true) {
+      _typingTimers[msg.conversationId]?.cancel();
+      _typingTimers.remove(msg.conversationId);
+      _typingStatus[msg.conversationId] = false;
+    }
     notifyListeners();
   }
 
@@ -158,6 +168,9 @@ class ChatProvider extends ChangeNotifier {
     _activeConversationId = null;
     _lastMessages.clear();
     _unreadCounts.clear();
+    _typingStatus.clear();
+    for (final t in _typingTimers.values) { t.cancel(); }
+    _typingTimers.clear();
     _pendingOpenConversationId = null;
     _friendRequests = [];
     _pendingRequestsCount = 0;
@@ -306,6 +319,7 @@ class ChatProvider extends ChangeNotifier {
       onPingReceived: _handlePingReceived,
       onPingSent: _handlePingReceived,
       onChatHistoryCleared: _handleChatHistoryCleared,
+      onMessageDeleted: _handleMessageDeleted,
       onDisappearingTimerUpdated: _handleDisappearingTimerUpdated,
       onConversationDeleted: _handleConversationDeleted,
       onSearchUsersResult: (data) {
@@ -315,6 +329,7 @@ class ChatProvider extends ChangeNotifier {
             .toList();
         notifyListeners();
       },
+      onPartnerTyping: _handlePartnerTyping,
       onDisconnect: (_) {
         _reconnect.onDisconnect(
           () => connect(token: _reconnect.tokenForReconnect!, userId: _currentUserId!),
@@ -415,6 +430,18 @@ class ChatProvider extends ChangeNotifier {
 
   void sendPing(int recipientId) {
     _socketService.sendPing(recipientId);
+  }
+
+  void emitTyping() {
+    if (_activeConversationId == null || _currentUserId == null) return;
+    ConversationModel? conv;
+    try {
+      conv = _conversations.firstWhere((c) => c.id == _activeConversationId);
+    } catch (_) { return; }
+    final recipientId = conv.userOne.id == _currentUserId
+        ? conv.userTwo.id
+        : conv.userOne.id;
+    _socketService.emitTyping(recipientId, _activeConversationId!);
   }
 
   Future<void> sendVoiceMessage({
@@ -604,6 +631,10 @@ class ChatProvider extends ChangeNotifier {
     _socketService.emitClearChatHistory(conversationId);
   }
 
+  void deleteMessage(int messageId, {required bool forEveryone}) {
+    _socketService.emitDeleteMessage(messageId, forEveryone: forEveryone);
+  }
+
   // ---------- Message delivery & history events ----------
 
   void _handleMessageDelivered(dynamic data) {
@@ -673,6 +704,33 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _handleMessageDeleted(dynamic data) {
+    final m = data as Map<String, dynamic>;
+    final messageId = m['messageId'] as int;
+    final conversationId = m['conversationId'] as int;
+    final forEveryone = m['forEveryone'] as bool? ?? false;
+
+    _messages.removeWhere((msg) => msg.id == messageId);
+
+    // Update last message preview for conversation list
+    if (_lastMessages[conversationId]?.id == messageId) {
+      final remaining = _messages.where((msg) => msg.conversationId == conversationId).toList();
+      if (remaining.isNotEmpty) {
+        remaining.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        _lastMessages[conversationId] = remaining.last;
+      } else {
+        _lastMessages.remove(conversationId);
+      }
+    }
+
+    // If delete for everyone and we weren't viewing this chat, refresh conv list to update lastMessage
+    if (forEveryone && _activeConversationId != conversationId) {
+      _socketService.getConversations();
+    }
+
+    notifyListeners();
+  }
+
   // ---------- Conversation events ----------
 
   void _handleDisappearingTimerUpdated(dynamic data) {
@@ -717,6 +775,19 @@ class ChatProvider extends ChangeNotifier {
       _activeConversationId = null;
     }
 
+    notifyListeners();
+  }
+
+  void _handlePartnerTyping(dynamic data) {
+    final map = data as Map<String, dynamic>;
+    final conversationId = map['conversationId'] as int;
+    _typingStatus[conversationId] = true;
+    _typingTimers[conversationId]?.cancel();
+    _typingTimers[conversationId] = Timer(const Duration(seconds: 3), () {
+      _typingStatus[conversationId] = false;
+      _typingTimers.remove(conversationId);
+      notifyListeners();
+    });
     notifyListeners();
   }
 
@@ -783,6 +854,9 @@ class ChatProvider extends ChangeNotifier {
     _currentUserId = null;
     _lastMessages.clear();
     _unreadCounts.clear();
+    _typingStatus.clear();
+    for (final t in _typingTimers.values) { t.cancel(); }
+    _typingTimers.clear();
     _pendingOpenConversationId = null;
     _friendRequests = [];
     _pendingRequestsCount = 0;

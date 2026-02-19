@@ -292,6 +292,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           onTap: () => _openChat(conv.id),
           onDelete: () => _deleteConversation(conv.id),
           otherUser: otherUser,
+          isTyping: chat.isPartnerTyping(conv.id),
         );
       },
     );

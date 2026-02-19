@@ -12,6 +12,7 @@ class ConversationTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final UserModel? otherUser;
+  final bool isTyping;
 
   const ConversationTile({
     super.key,
@@ -22,6 +23,7 @@ class ConversationTile extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     this.otherUser,
+    this.isTyping = false,
   });
 
   String _formatTime(DateTime dt) {
@@ -136,7 +138,18 @@ class ConversationTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (lastMessage != null) ...[
+                    if (isTyping) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'typing...',
+                        style: RpgTheme.bodyFont(
+                          fontSize: 13,
+                          color: RpgTheme.primaryColor(context),
+                        ).copyWith(fontStyle: FontStyle.italic),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ] else if (lastMessage != null) ...[
                       const SizedBox(height: 3),
                       Text(
                         lastMessage!.messageType == MessageType.ping

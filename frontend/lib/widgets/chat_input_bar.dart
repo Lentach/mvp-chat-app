@@ -35,6 +35,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   AudioRecorder? _audioRecorder;
   String? _recordingPath;
   Timer? _recordingTimer;
+  Timer? _typingDebounceTimer;
   DateTime? _recordingStartTime;
 
   // Slide-to-cancel: drag mic TO trash to cancel (release over trash zone)
@@ -58,6 +59,12 @@ class _ChatInputBarState extends State<ChatInputBar>
       if (has != _hasText) {
         setState(() => _hasText = has);
       }
+      if (has) {
+        _typingDebounceTimer?.cancel();
+        _typingDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) context.read<ChatProvider>().emitTyping();
+        });
+      }
     });
     _actionPanelController = AnimationController(
       duration: const Duration(milliseconds: 250),
@@ -80,6 +87,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     _actionPanelController.dispose();
     _pulseController.dispose();
     _recordingTimer?.cancel();
+    _typingDebounceTimer?.cancel();
     _audioRecorder?.dispose();
     super.dispose();
   }

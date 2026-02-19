@@ -28,9 +28,11 @@ class SocketService {
     required void Function(dynamic) onPingReceived,
     required void Function(dynamic) onPingSent,
     required void Function(dynamic) onChatHistoryCleared,
+    required void Function(dynamic) onMessageDeleted,
     required void Function(dynamic) onDisappearingTimerUpdated,
     required void Function(dynamic) onConversationDeleted,
     required void Function(dynamic) onSearchUsersResult,
+    void Function(dynamic)? onPartnerTyping,
   }) {
     // Defensive cleanup: ensure any previous socket is fully disposed
     // before creating a new one (prevents cache reuse)
@@ -70,9 +72,13 @@ class SocketService {
     _socket!.on('newPing', onPingReceived);
     _socket!.on('pingSent', onPingSent);
     _socket!.on('chatHistoryCleared', onChatHistoryCleared);
+    _socket!.on('messageDeleted', onMessageDeleted);
     _socket!.on('disappearingTimerUpdated', onDisappearingTimerUpdated);
     _socket!.on('conversationDeleted', onConversationDeleted);
     _socket!.on('searchUsersResult', onSearchUsersResult);
+    if (onPartnerTyping != null) {
+      _socket!.on('partnerTyping', onPartnerTyping);
+    }
     _socket!.onDisconnect(onDisconnect);
 
     _socket!.connect();
@@ -130,6 +136,14 @@ class SocketService {
     _socket!.emit('clearChatHistory', {'conversationId': conversationId});
   }
 
+  void emitDeleteMessage(int messageId, {required bool forEveryone}) {
+    if (_socket == null) return;
+    _socket!.emit('deleteMessage', {
+      'messageId': messageId,
+      'mode': forEveryone ? 'for_everyone' : 'for_me',
+    });
+  }
+
   void emitDeleteConversationOnly(int conversationId) {
     _socket?.emit('deleteConversationOnly', {
       'conversationId': conversationId,
@@ -141,6 +155,13 @@ class SocketService {
     _socket!.emit('setDisappearingTimer', {
       'conversationId': conversationId,
       'seconds': seconds,
+    });
+  }
+
+  void emitTyping(int recipientId, int conversationId) {
+    _socket?.emit('typing', {
+      'recipientId': recipientId,
+      'conversationId': conversationId,
     });
   }
 

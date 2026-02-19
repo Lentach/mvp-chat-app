@@ -196,7 +196,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return conv != null ? context.read<ChatProvider>().getOtherUser(conv) : null;
   }
 
-  Widget _buildHeaderTitle(BuildContext context, String contactName, UserModel? otherUser) {
+  /// statusText: e.g. "typing..." or "Recording voice..."
+  Widget _buildHeaderTitle(
+    BuildContext context,
+    String contactName,
+    UserModel? otherUser,
+    String? statusText,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     final accentColor = RpgTheme.primaryColor(context);
     final baseStyle = RpgTheme.bodyFont(
@@ -204,7 +210,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       color: colorScheme.onSurface,
       fontWeight: FontWeight.w600,
     );
-    return AnimatedSwitcher(
+    final nameWidget = AnimatedSwitcher(
       duration: const Duration(milliseconds: 250),
       switchInCurve: Curves.easeOut,
       switchOutCurve: Curves.easeIn,
@@ -250,6 +256,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               overflow: TextOverflow.ellipsis,
             ),
     );
+    if (statusText == null || statusText.isEmpty) return nameWidget;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        nameWidget,
+        Text(
+          statusText,
+          style: RpgTheme.bodyFont(
+            fontSize: 12,
+            color: accentColor,
+          ).copyWith(fontStyle: FontStyle.italic),
+        ),
+      ],
+    );
+  }
+
+  String? _getHeaderStatusText(ChatProvider chat) {
+    if (chat.isRecordingVoice) return 'Recording voice...';
+    if (chat.isPartnerTyping(widget.conversationId)) return 'typing...';
+    return null;
   }
 
   bool _isDifferentDay(DateTime a, DateTime b) {
@@ -376,7 +403,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
                 Expanded(
                   child: Center(
-                    child: _buildHeaderTitle(context, contactName, otherUser),
+                    child: _buildHeaderTitle(context, contactName, otherUser, _getHeaderStatusText(chat)),
                   ),
                 ),
               ],
@@ -415,7 +442,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             Navigator.of(context).pop();
           },
         ),
-        title: _buildHeaderTitle(context, contactName, otherUser),
+        title: _buildHeaderTitle(context, contactName, otherUser, _getHeaderStatusText(chat)),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
