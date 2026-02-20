@@ -15,7 +15,8 @@ class PushService {
   // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
   // → Generate key pair → copy the public key.
   // TODO: Replace with your real VAPID key.
-  static const String _vapidKey = 'TODO_REPLACE_WITH_REAL_VAPID_KEY';
+  static const String _vapidKey =
+      'BOkbC_6t7ScCiTLyuLyM0wEG3TnXfpQaAMwZUeJHuWhtt7HVr0u3zG60xm4kqqhnNzuHZco-8h0Nt_WRYRZrZHU';
 
   PushService(this._api);
 
