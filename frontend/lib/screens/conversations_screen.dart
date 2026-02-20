@@ -238,7 +238,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   Widget _buildConversationList() {
     final chat = context.watch<ChatProvider>();
-    final conversations = chat.conversations;
+    final conversations = chat.sortedConversations;
     final isDark = RpgTheme.isDark(context);
     final mutedColor =
         isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;

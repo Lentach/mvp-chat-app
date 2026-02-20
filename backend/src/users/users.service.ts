@@ -13,6 +13,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Conversation } from '../conversations/conversation.entity';
 import { Message } from '../messages/message.entity';
 import { FriendRequest } from '../friends/friend-request.entity';
+import { FcmTokensService } from '../fcm-tokens/fcm-tokens.service';
 
 @Injectable()
 export class UsersService {
@@ -28,6 +29,7 @@ export class UsersService {
     @InjectRepository(FriendRequest)
     private friendRequestRepo: Repository<FriendRequest>,
     private cloudinaryService: CloudinaryService,
+    private fcmTokensService: FcmTokensService,
   ) {}
 
   async create(username: string, password: string): Promise<User> {
@@ -155,6 +157,9 @@ export class UsersService {
     if (friendRequests.length > 0) {
       await this.friendRequestRepo.remove(friendRequests);
     }
+
+    // Remove FCM tokens before user deletion
+    await this.fcmTokensService.removeByUserId(userId);
 
     await this.usersRepo.remove(user);
     this.auditLogger.log(`deleteAccount success userId=${userId} username=${user.username}`);

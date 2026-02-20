@@ -4,6 +4,7 @@ import { ConversationsService } from '../../conversations/conversations.service'
 import { MessagesService } from '../../messages/messages.service';
 import { UsersService } from '../../users/users.service';
 import { FriendsService } from '../../friends/friends.service';
+import { BlockedService } from '../../blocked/blocked.service';
 import { validateDto } from '../utils/dto.validator';
 import {
   StartConversationDto,
@@ -21,6 +22,7 @@ export class ChatConversationService {
     private readonly messagesService: MessagesService,
     private readonly usersService: UsersService,
     private readonly friendsService: FriendsService,
+    private readonly blockedService: BlockedService,
   ) {}
 
   async handleStartConversation(
@@ -45,6 +47,15 @@ export class ChatConversationService {
 
     if (!user || !otherUser) {
       client.emit('error', { message: 'User not found' });
+      return;
+    }
+
+    const blocked = await this.blockedService.isBlockedByEither(
+      userId,
+      data.recipientId,
+    );
+    if (blocked) {
+      client.emit('error', { message: 'Cannot message this user' });
       return;
     }
 
@@ -78,6 +89,16 @@ export class ChatConversationService {
         ConversationMapper.toPayload(conv, { unreadCount, lastMessage }),
       );
     }
+    // Sort by newest message first (conversation with most recent activity at top)
+    result.sort((a, b) => {
+      const aTime = a.lastMessage?.createdAt
+        ? new Date(a.lastMessage.createdAt).getTime()
+        : new Date(a.createdAt).getTime();
+      const bTime = b.lastMessage?.createdAt
+        ? new Date(b.lastMessage.createdAt).getTime()
+        : new Date(b.createdAt).getTime();
+      return bTime - aTime;
+    });
     return result;
   }
 
@@ -91,7 +112,17 @@ export class ChatConversationService {
     this.logger.debug(
       `handleGetConversations: userId=${userId}, username=${client.data.user?.username}`,
     );
-    const conversations = await this.conversationsService.findByUser(userId);
+    const [rawConversations, blockedIds, blockedByUserIds] = await Promise.all([
+      this.conversationsService.findByUser(userId),
+      this.blockedService.getBlockedUserIds(userId),
+      this.blockedService.getBlockedByUserIds(userId),
+    ]);
+    const excludeSet = new Set([...blockedIds, ...blockedByUserIds]);
+    const conversations = rawConversations.filter((conv) => {
+      const otherId =
+        conv.userOne.id === userId ? conv.userTwo.id : conv.userOne.id;
+      return !excludeSet.has(otherId);
+    });
     this.logger.debug(
       `handleGetConversations: found ${conversations.length} conversations for userId=${userId}`,
     );

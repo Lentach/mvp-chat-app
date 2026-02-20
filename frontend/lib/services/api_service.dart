@@ -123,6 +123,40 @@ class ApiService {
     }
   }
 
+  Future<void> registerFcmToken(
+    String jwtToken,
+    String fcmToken,
+    String platform,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users/fcm-token'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $jwtToken',
+      },
+      body: jsonEncode({'token': fcmToken, 'platform': platform}),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to register FCM token');
+    }
+  }
+
+  Future<void> removeFcmToken(String jwtToken, String fcmToken) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/users/fcm-token'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $jwtToken',
+      },
+      body: jsonEncode({'token': fcmToken}),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to remove FCM token');
+    }
+  }
+
   Future<Map<String, dynamic>> uploadImageMessage(
     String token,
     XFile imageFile,

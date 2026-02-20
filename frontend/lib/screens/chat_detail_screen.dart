@@ -12,6 +12,7 @@ import '../models/conversation_model.dart';
 import '../models/user_model.dart';
 import '../widgets/avatar_circle.dart';
 import '../widgets/ping_effect_overlay.dart';
+import '../widgets/top_snackbar.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final int conversationId;
@@ -35,8 +36,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _showingFullHandle = false;
   int _newMessagesCount = 0;
   int _lastMessageCount = 0;
+  int _lastLinkPreviewCount = 0;
   double _lastKeyboardHeight = 0;
+  /// When true, ListView uses large cacheExtent so all items are built and scroll-to-bottom lands at real end.
+  bool _expandCacheForScroll = false;
   static const double _scrollToBottomThreshold = 80;
+  static const double _largeCacheExtent = 10000;
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
@@ -50,8 +55,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void _onNewMessages(int currentCount, int added) {
     if (added <= 0) return;
     _lastMessageCount = currentCount;
-    // Always scroll to bottom for new messages (especially after sending)
-    _scrollToBottom();
+    final chat = context.read<ChatProvider>();
+    _lastLinkPreviewCount = chat.messages.where((m) => m.linkPreviewUrl != null).length;
+    // When opening conversation, expand cache so ListView builds all items and maxScrollExtent is correct.
+    final isInitialLoad = added == currentCount && currentCount > 0;
+    if (isInitialLoad) {
+      setState(() => _expandCacheForScroll = true);
+      // Defer scroll until after the rebuild with expanded cache has been laid out.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _scrollToBottom();
+        });
+      });
+    } else {
+      _scrollToBottom();
+    }
   }
 
   @override
@@ -62,7 +81,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       // Always reload messages from server when entering/re-entering chat
       // to ensure timed messages reflect their current state
       context.read<ChatProvider>().openConversation(widget.conversationId);
-      _scrollToBottomOnce();
     });
 
     // Refresh every second: remove expired and tick countdown. No setState here -
@@ -87,11 +105,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _showFullHandleTimer?.cancel();
       _showingFullHandle = false;
       _lastMessageCount = 0;
+      _lastLinkPreviewCount = 0;
       _newMessagesCount = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<ChatProvider>().openConversation(widget.conversationId);
       });
-      _scrollToBottomOnce();
     }
   }
 
@@ -113,13 +131,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
   }
 
-  void _scrollToBottomOnce() {
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
-      _scrollToBottom();
-    });
-  }
-
   void _scrollToBottom() {
     if (mounted) setState(() => _newMessagesCount = 0);
     // Delay scroll to give time for message to render and avoid stealing keyboard focus
@@ -129,8 +140,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
-      );
-      if (mounted) setState(() => _lastMessageCount = context.read<ChatProvider>().messages.length);
+      ).then((_) {
+        if (mounted) {
+          setState(() {
+            _lastMessageCount = context.read<ChatProvider>().messages.length;
+            _expandCacheForScroll = false;
+          });
+        }
+      });
+    });
+  }
+
+  void _onScrollToBottomButtonTap() {
+    setState(() => _expandCacheForScroll = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scrollToBottom();
     });
   }
 
@@ -143,7 +168,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         borderRadius: BorderRadius.circular(24),
         color: Theme.of(context).colorScheme.surface,
         child: InkWell(
-          onTap: _scrollToBottom,
+          onTap: _onScrollToBottomButtonTap,
           borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.all(10),
@@ -302,6 +327,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       });
     }
 
+    // When a link preview arrives, the same message is updated in place (no count change)
+    // but the bubble grows; scroll to bottom so the expanded message stays visible.
+    final linkPreviewCount = messages.where((m) => m.linkPreviewUrl != null).length;
+    if (messages.isNotEmpty && linkPreviewCount > _lastLinkPreviewCount) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _lastLinkPreviewCount = linkPreviewCount);
+        _scrollToBottom();
+      });
+    }
+
     // Auto-scroll when keyboard opens to keep newest message visible
     if (keyboardHeight > 0 && _lastKeyboardHeight == 0 && messages.isNotEmpty) {
       // Keyboard just opened - scroll to bottom after layout settles
@@ -328,6 +364,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         isDark ? RpgTheme.messagesAreaBg : RpgTheme.messagesAreaBgLight;
     final mutedColor =
         isDark ? RpgTheme.mutedDark : RpgTheme.textSecondaryLight;
+    final otherUser = _getOtherUser();
+    final activeConv = chat.getConversationById(widget.conversationId);
+    if (activeConv == null && chat.conversations.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+          if (mounted) {
+            showTopSnackBar(
+              context,
+              "You can't message this user",
+              backgroundColor: colorScheme.error,
+            );
+          }
+        }
+      });
+    }
 
     final body = SafeArea(
       child: Column(
@@ -347,6 +400,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     )
                   : ListView.builder(
                       controller: _scrollController,
+                      cacheExtent: _expandCacheForScroll ? _largeCacheExtent : null,
                       padding: const EdgeInsets.only(
                         left: 12,
                         right: 12,
@@ -374,12 +428,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
             ),
           ),
-          const ChatInputBar(),
+          if (otherUser != null && chat.blockedByUserIds.contains(otherUser.id))
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              child: Center(
+                child: Text(
+                  "You can't type to this user",
+                  style: RpgTheme.bodyFont(
+                    fontSize: 13,
+                    color: mutedColor,
+                  ).copyWith(fontStyle: FontStyle.italic),
+                ),
+              ),
+            )
+          else
+            const ChatInputBar(),
         ],
       ),
     );
 
-    final otherUser = _getOtherUser();
     if (widget.isEmbedded) {
       final borderColor = isDark
           ? RpgTheme.convItemBorderDark
@@ -445,6 +514,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
         title: _buildHeaderTitle(context, contactName, otherUser, _getHeaderStatusText(chat)),
         actions: [
+          if (otherUser != null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'block') {
+                  context.read<ChatProvider>().blockUser(otherUser!.id);
+                  Navigator.of(context).pop();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem<String>(
+                  value: 'block',
+                  child: Text('Block user'),
+                ),
+              ],
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: GestureDetector(

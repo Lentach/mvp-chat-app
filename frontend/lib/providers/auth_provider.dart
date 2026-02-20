@@ -4,10 +4,12 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/push_service.dart';
 import '../config/app_config.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _api = ApiService(baseUrl: AppConfig.baseUrl);
+  late final PushService _pushService = PushService(_api);
 
   String? _token;
   UserModel? _currentUser;
@@ -48,7 +50,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _statusMessage = e.toString().replaceFirst('Exception: ', '');
+      _statusMessage = _userFriendlyNetworkError(e);
       _isError = true;
       notifyListeners();
       return false;
@@ -76,14 +78,31 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _statusMessage = e.toString().replaceFirst('Exception: ', '');
+      _statusMessage = _userFriendlyNetworkError(e);
       _isError = true;
       notifyListeners();
       return false;
     }
   }
 
+  static String _userFriendlyNetworkError(Object e) {
+    final msg = e.toString().replaceFirst('Exception: ', '');
+    if (msg.contains('Failed to fetch') ||
+        msg.contains('Connection refused') ||
+        msg.contains('Connection reset') ||
+        msg.contains('SocketException') ||
+        msg.contains('NetworkException')) {
+      return 'Cannot reach server. Is the backend running? (e.g. docker-compose up)';
+    }
+    return msg;
+  }
+
   Future<void> logout() async {
+    // Unregister FCM token before clearing JWT (need token for API call)
+    if (_token != null) {
+      await _pushService.unregister(_token!);
+    }
+
     _token = null;
     _currentUser = null;
     _statusMessage = null;

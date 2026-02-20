@@ -1,0 +1,89 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { BlockedUser } from './blocked-user.entity';
+import { User } from '../users/user.entity';
+import { FriendsService } from '../friends/friends.service';
+
+@Injectable()
+export class BlockedService {
+  private readonly logger = new Logger(BlockedService.name);
+
+  constructor(
+    @InjectRepository(BlockedUser)
+    private readonly blockedRepo: Repository<BlockedUser>,
+    private readonly friendsService: FriendsService,
+  ) {}
+
+  async block(blockerId: number, blockedId: number): Promise<BlockedUser> {
+    if (blockerId === blockedId) {
+      throw new Error('Cannot block yourself');
+    }
+    let existing = await this.blockedRepo.findOne({
+      where: { blocker: { id: blockerId }, blocked: { id: blockedId } },
+    });
+    if (existing) {
+      return existing;
+    }
+    const record = this.blockedRepo.create({
+      blocker: { id: blockerId } as User,
+      blocked: { id: blockedId } as User,
+    });
+    await this.blockedRepo.save(record);
+    await this.friendsService.unfriend(blockerId, blockedId);
+    this.logger.debug(`User ${blockerId} blocked user ${blockedId}`);
+    return record;
+  }
+
+  async unblock(blockerId: number, blockedId: number): Promise<boolean> {
+    const result = await this.blockedRepo.delete({
+      blocker: { id: blockerId },
+      blocked: { id: blockedId },
+    });
+    if (result.affected && result.affected > 0) {
+      this.logger.debug(`User ${blockerId} unblocked user ${blockedId}`);
+      return true;
+    }
+    return false;
+  }
+
+  async getBlockedUserIds(blockerId: number): Promise<number[]> {
+    const rows = await this.blockedRepo.find({
+      where: { blocker: { id: blockerId } },
+      relations: ['blocked'],
+    });
+    return rows.map((r) => r.blocked.id);
+  }
+
+  /** User IDs who have blocked this user (so we can hide them from their lists). */
+  async getBlockedByUserIds(blockedId: number): Promise<number[]> {
+    const rows = await this.blockedRepo.find({
+      where: { blocked: { id: blockedId } },
+      relations: ['blocker'],
+    });
+    return rows.map((r) => r.blocker.id);
+  }
+
+  async getBlockedUsers(blockerId: number): Promise<User[]> {
+    const rows = await this.blockedRepo.find({
+      where: { blocker: { id: blockerId } },
+      relations: ['blocked'],
+    });
+    return rows.map((r) => r.blocked);
+  }
+
+  /** True if blockerId has blocked blockedId */
+  async isBlocked(blockerId: number, blockedId: number): Promise<boolean> {
+    const one = await this.blockedRepo.findOne({
+      where: { blocker: { id: blockerId }, blocked: { id: blockedId } },
+    });
+    return !!one;
+  }
+
+  /** True if either user has blocked the other (so they cannot message each other) */
+  async isBlockedByEither(userId1: number, userId2: number): Promise<boolean> {
+    const a = await this.isBlocked(userId1, userId2);
+    if (a) return true;
+    return this.isBlocked(userId2, userId1);
+  }
+}

@@ -1,9 +1,9 @@
+import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import {
-  IsString,
-  Matches,
-  MaxLength,
-  MinLength,
-} from 'class-validator';
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_REGEX,
+  PASSWORD_REGEX_MESSAGE,
+} from '../password.constants';
 
 export class RegisterDto {
   @IsString()
@@ -14,9 +14,9 @@ export class RegisterDto {
   })
   username: string;
 
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\s@$!%*?&]{8,}$/, {
-    message: 'Password must contain uppercase, lowercase, and number',
+  @MinLength(PASSWORD_MIN_LENGTH, {
+    message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters long`,
   })
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_REGEX_MESSAGE })
   password: string;
 }

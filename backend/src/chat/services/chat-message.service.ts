@@ -6,6 +6,7 @@ import { FriendsService } from '../../friends/friends.service';
 import { BlockedService } from '../../blocked/blocked.service';
 import { UsersService } from '../../users/users.service';
 import { LinkPreviewService } from './link-preview.service';
+import { PushNotificationsService } from '../../push-notifications/push-notifications.service';
 import { validateDto } from '../utils/dto.validator';
 import { SendMessageDto, GetMessagesDto, ClearChatHistoryDto, DeleteMessageDto, AddReactionDto, RemoveReactionDto } from '../dto/chat.dto';
 import { SendPingDto } from '../dto/send-ping.dto';
@@ -23,6 +24,7 @@ export class ChatMessageService {
     private readonly blockedService: BlockedService,
     private readonly usersService: UsersService,
     private readonly linkPreviewService: LinkPreviewService,
+    private readonly pushNotificationsService: PushNotificationsService,
   ) {}
 
   async handleSendMessage(
@@ -100,10 +102,12 @@ export class ChatMessageService {
     // Emit to sender (confirmation)
     client.emit('messageSent', messagePayload);
 
-    // Emit to recipient if online
+    // Emit to recipient if online; push notify if offline
     const recipientSocketId = onlineUsers.get(data.recipientId);
     if (recipientSocketId) {
       server.to(recipientSocketId).emit('newMessage', messagePayload);
+    } else {
+      this.pushNotificationsService.notify(data.recipientId).catch(() => {});
     }
 
     // Async link preview — fire and forget, does not block send
@@ -276,6 +280,8 @@ export class ChatMessageService {
     const recipientSocketId = onlineUsers.get(recipientId);
     if (recipientSocketId) {
       server.to(recipientSocketId).emit('newPing', payload);
+    } else {
+      this.pushNotificationsService.notify(recipientId).catch(() => {});
     }
   }
 

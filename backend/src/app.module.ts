@@ -10,10 +10,15 @@ import { ChatModule } from './chat/chat.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { MessagesModule } from './messages/messages.module';
 import { FriendsModule } from './friends/friends.module';
+import { BlockedModule } from './blocked/blocked.module';
+import { FcmTokensModule } from './fcm-tokens/fcm-tokens.module';
+import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { User } from './users/user.entity';
 import { Conversation } from './conversations/conversation.entity';
 import { Message } from './messages/message.entity';
 import { FriendRequest } from './friends/friend-request.entity';
+import { BlockedUser } from './blocked/blocked-user.entity';
+import { FcmToken } from './fcm-tokens/fcm-token.entity';
 import { validate } from './config/env.validation';
 
 @Module({
@@ -45,7 +50,7 @@ import { validate } from './config/env.validation';
         username: configService.get('DB_USER'),
         password: configService.get('DB_PASS'),
         database: configService.get('DB_NAME'),
-        entities: [User, Conversation, Message, FriendRequest],
+        entities: [User, Conversation, Message, FriendRequest, BlockedUser, FcmToken],
         synchronize: configService.get('NODE_ENV') === 'development',
       }),
     }),
@@ -55,6 +60,9 @@ import { validate } from './config/env.validation';
     ConversationsModule,
     MessagesModule,
     FriendsModule,
+    BlockedModule,
+    FcmTokensModule,
+    PushNotificationsModule,
     ChatModule,
   ],
 })

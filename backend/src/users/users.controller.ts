@@ -16,7 +16,8 @@ import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UsersService } from './users.service';
-import { ResetPasswordDto, DeleteAccountDto } from './dto/user.dto';
+import { ResetPasswordDto, DeleteAccountDto, RegisterFcmTokenDto, RemoveFcmTokenDto } from './dto/user.dto';
+import { FcmTokensService } from '../fcm-tokens/fcm-tokens.service';
 
 @Controller('users')
 export class UsersController {
@@ -25,6 +26,7 @@ export class UsersController {
   constructor(
     private usersService: UsersService,
     private cloudinaryService: CloudinaryService,
+    private fcmTokensService: FcmTokensService,
   ) {}
 
   @Post('profile-picture')
@@ -104,5 +106,20 @@ export class UsersController {
     await this.usersService.deleteAccount(userId, dto.password);
 
     return { message: 'Account deleted successfully' };
+  }
+
+  @Post('fcm-token')
+  @UseGuards(JwtAuthGuard)
+  async registerFcmToken(@Body() dto: RegisterFcmTokenDto, @Request() req) {
+    const userId = req.user.id;
+    await this.fcmTokensService.upsert(userId, dto.token, dto.platform);
+    return { message: 'FCM token registered' };
+  }
+
+  @Delete('fcm-token')
+  @UseGuards(JwtAuthGuard)
+  async removeFcmToken(@Body() dto: RemoveFcmTokenDto, @Request() req) {
+    await this.fcmTokensService.removeByToken(dto.token);
+    return { message: 'FCM token removed' };
   }
 }

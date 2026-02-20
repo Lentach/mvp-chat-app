@@ -10,6 +10,7 @@ import '../models/friend_request_model.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/push_service.dart';
 import '../services/socket_service.dart';
 import 'chat_reconnect_manager.dart';
 import 'conversation_helpers.dart' as conv_helpers;
@@ -17,6 +18,9 @@ import 'conversation_helpers.dart' as conv_helpers;
 class ChatProvider extends ChangeNotifier {
   final SocketService _socketService = SocketService();
   final ChatReconnectManager _reconnect = ChatReconnectManager();
+  late final PushService _pushService =
+      PushService(ApiService(baseUrl: AppConfig.baseUrl));
+  bool _pushInitialized = false;
 
   // ---------- State ----------
   List<ConversationModel> _conversations = [];
@@ -65,6 +69,17 @@ class ChatProvider extends ChangeNotifier {
   }
 
   List<ConversationModel> get conversations => _conversations;
+
+  /// Conversations sorted by newest message first (for list display).
+  List<ConversationModel> get sortedConversations {
+    final list = List<ConversationModel>.from(_conversations);
+    list.sort((a, b) {
+      final aTime = _lastMessages[a.id]?.createdAt ?? a.createdAt;
+      final bTime = _lastMessages[b.id]?.createdAt ?? b.createdAt;
+      return bTime.compareTo(aTime);
+    });
+    return list;
+  }
   List<MessageModel> get messages => _messages;
   int? get activeConversationId => _activeConversationId;
   int? get currentUserId => _currentUserId;
@@ -230,6 +245,11 @@ class ChatProvider extends ChangeNotifier {
             _socketService.getConversations();
           }
         });
+        // Initialize push notifications once per session (first connect only)
+        if (!_pushInitialized) {
+          _pushInitialized = true;
+          _pushService.initialize(token).catchError((_) {});
+        }
       },
       onConversationsList: (data) {
         final list = data as List<dynamic>;
@@ -1018,6 +1038,7 @@ class ChatProvider extends ChangeNotifier {
     _pendingRequestsCount = 0;
     _friends = [];
     _friendRequestJustSent = false;
+    _pushInitialized = false; // Allow re-registration on next login
     notifyListeners();
   }
 

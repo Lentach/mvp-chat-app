@@ -78,4 +78,59 @@ describe('SendMessageDto mediaUrl validation', () => {
     const result = validateDto(SendMessageDto, textPayload);
     expect(result.mediaUrl).toBeUndefined();
   });
+
+  it('should accept null mediaUrl (ValidateIf skips null)', () => {
+    const data = { ...validVoicePayload, mediaUrl: null };
+    expect(() => validateDto(SendMessageDto, data)).not.toThrow();
+  });
+
+  it('should accept empty string mediaUrl (ValidateIf skips empty string)', () => {
+    const data = { ...validVoicePayload, mediaUrl: '' };
+    expect(() => validateDto(SendMessageDto, data)).not.toThrow();
+  });
+
+  it('should reject HTTP (non-HTTPS) Cloudinary URL', () => {
+    const data = {
+      ...validVoicePayload,
+      mediaUrl: 'http://res.cloudinary.com/demo/video/upload/v1/voice.m4a',
+    };
+    expect(() => validateDto(SendMessageDto, data)).toThrow(BadRequestException);
+    expect(() => validateDto(SendMessageDto, data)).toThrow(/Cloudinary/);
+  });
+
+  it('should reject Cloudinary URL missing /upload/ segment', () => {
+    const data = {
+      ...validVoicePayload,
+      mediaUrl: 'https://res.cloudinary.com/demo/video/v1/voice.m4a',
+    };
+    expect(() => validateDto(SendMessageDto, data)).toThrow(BadRequestException);
+    expect(() => validateDto(SendMessageDto, data)).toThrow(/Cloudinary/);
+  });
+
+  it('should reject Cloudinary URL with unsupported resource type (raw)', () => {
+    const data = {
+      ...validVoicePayload,
+      mediaUrl: 'https://res.cloudinary.com/demo/raw/upload/v1/file.txt',
+    };
+    expect(() => validateDto(SendMessageDto, data)).toThrow(BadRequestException);
+    expect(() => validateDto(SendMessageDto, data)).toThrow(/Cloudinary/);
+  });
+
+  it('should reject data: URL', () => {
+    const data = {
+      ...validVoicePayload,
+      mediaUrl: 'data:audio/mp3;base64,AAAAAAA==',
+    };
+    expect(() => validateDto(SendMessageDto, data)).toThrow(BadRequestException);
+    expect(() => validateDto(SendMessageDto, data)).toThrow(/Cloudinary/);
+  });
+
+  it('should reject URL impersonating Cloudinary domain via subdomain', () => {
+    const data = {
+      ...validVoicePayload,
+      mediaUrl: 'https://res.cloudinary.com.evil.com/demo/video/upload/v1/x.mp3',
+    };
+    expect(() => validateDto(SendMessageDto, data)).toThrow(BadRequestException);
+    expect(() => validateDto(SendMessageDto, data)).toThrow(/Cloudinary/);
+  });
 });

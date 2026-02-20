@@ -38,6 +38,61 @@ class ContactsScreen extends StatelessWidget {
     }
   }
 
+  void _showContactContextMenu(BuildContext context, UserModel user) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = RpgTheme.isDark(context);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: Icon(Icons.person_remove, color: colorScheme.error),
+                  title: Text(
+                    'Usuń z kontaktów',
+                    style: RpgTheme.bodyFont(
+                      fontSize: 14,
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _unfriendContact(context, user.id, user.username);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.block, color: colorScheme.error),
+                  title: Text(
+                    'Block',
+                    style: RpgTheme.bodyFont(
+                      fontSize: 14,
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    context.read<ChatProvider>().blockUser(user.id);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _unfriendContact(BuildContext context, int userId, String username) {
     showDialog(
       context: context,
@@ -210,7 +265,7 @@ class ContactsScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: () => _openChatWithContact(context, user.id),
-        onLongPress: () => _unfriendContact(context, user.id, user.username),
+        onLongPress: () => _showContactContextMenu(context, user),
         borderRadius: BorderRadius.circular(8),
         splashColor: RpgTheme.primaryColor(context).withValues(alpha: 0.2),
         child: Padding(

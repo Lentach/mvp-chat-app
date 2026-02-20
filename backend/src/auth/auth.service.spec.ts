@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -51,46 +51,15 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('should create user with valid password', async () => {
+    it('should create user and return id/username/tag', async () => {
       usersService.create.mockResolvedValue(mockUser as User);
       const result = await service.register('testuser', 'ValidPass1');
-      expect(usersService.create).toHaveBeenCalledWith(
-        'testuser',
-        'ValidPass1',
-      );
+      expect(usersService.create).toHaveBeenCalledWith('testuser', 'ValidPass1');
       expect(result).toEqual({ id: 1, username: 'testuser', tag: '0427' });
     });
 
-    it('should reject password shorter than 8 chars', async () => {
-      await expect(service.register('testuser', 'Short1')).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.register('testuser', 'Short1')).rejects.toThrow(
-        /at least 8 characters/,
-      );
-      expect(usersService.create).not.toHaveBeenCalled();
-    });
-
-    it('should reject password without uppercase', async () => {
-      await expect(service.register('testuser', 'lowercase1')).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(usersService.create).not.toHaveBeenCalled();
-    });
-
-    it('should reject password without lowercase', async () => {
-      await expect(service.register('testuser', 'UPPERCASE1')).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(usersService.create).not.toHaveBeenCalled();
-    });
-
-    it('should reject password without number', async () => {
-      await expect(service.register('testuser', 'NoNumberHere')).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(usersService.create).not.toHaveBeenCalled();
-    });
+    // Password strength validation is enforced at the DTO layer (RegisterDto).
+    // See password.spec.ts for those tests.
   });
 
   describe('login', () => {

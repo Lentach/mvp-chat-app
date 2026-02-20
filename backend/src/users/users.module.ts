@@ -7,11 +7,13 @@ import { UsersController } from './users.controller';
 import { Conversation } from '../conversations/conversation.entity';
 import { Message } from '../messages/message.entity';
 import { FriendRequest } from '../friends/friend-request.entity';
+import { FcmTokensModule } from '../fcm-tokens/fcm-tokens.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Conversation, Message, FriendRequest]),
     MulterModule.register(),
+    FcmTokensModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

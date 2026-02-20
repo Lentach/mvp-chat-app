@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { FriendsService } from '../../friends/friends.service';
+import { BlockedService } from '../../blocked/blocked.service';
 import { UsersService } from '../../users/users.service';
 import { User } from '../../users/user.entity';
 import { ConversationsService } from '../../conversations/conversations.service';
@@ -22,6 +23,7 @@ export class ChatFriendRequestService {
 
   constructor(
     private readonly friendsService: FriendsService,
+    private readonly blockedService: BlockedService,
     private readonly usersService: UsersService,
     private readonly conversationsService: ConversationsService,
   ) {}
@@ -183,6 +185,16 @@ export class ChatFriendRequestService {
     }
     if (recipient.id === senderId) {
       client.emit('error', { message: 'Cannot send friend request to yourself' });
+      return;
+    }
+
+    // If recipient has blocked sender, do not allow the request
+    const recipientBlockedSender = await this.blockedService.isBlocked(
+      recipient.id,
+      sender.id,
+    );
+    if (recipientBlockedSender) {
+      client.emit('error', { message: 'You are blocked by this user' });
       return;
     }
 
@@ -414,8 +426,14 @@ export class ChatFriendRequestService {
     const userId: number = client.data.user?.id;
     if (!userId) return;
 
-    const friends = await this.friendsService.getFriends(userId);
-    const list = friends.map((u) => UserMapper.toPayload(u));
+    const [friends, blockedIds, blockedByUserIds] = await Promise.all([
+      this.friendsService.getFriends(userId),
+      this.blockedService.getBlockedUserIds(userId),
+      this.blockedService.getBlockedByUserIds(userId),
+    ]);
+    const excludeSet = new Set([...blockedIds, ...blockedByUserIds]);
+    const filtered = friends.filter((u) => !excludeSet.has(u.id));
+    const list = filtered.map((u) => UserMapper.toPayload(u));
     client.emit('friendsList', list);
   }
 

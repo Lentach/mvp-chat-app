@@ -14,6 +14,10 @@ import { UsersService } from '../users/users.service';
 import { ChatMessageService } from './services/chat-message.service';
 import { ChatFriendRequestService } from './services/chat-friend-request.service';
 import { ChatConversationService } from './services/chat-conversation.service';
+import { BlockedService } from '../blocked/blocked.service';
+import { validateDto } from './utils/dto.validator';
+import { BlockUserDto } from './dto/chat.dto';
+import { UserMapper } from './mappers/user.mapper';
 
 // CORS: In production only ALLOWED_ORIGINS. In dev also allow localhost + LAN (phone).
 function buildCorsOrigin() {
@@ -61,6 +65,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private chatMessageService: ChatMessageService,
     private chatFriendRequestService: ChatFriendRequestService,
     private chatConversationService: ChatConversationService,
+    private blockedService: BlockedService,
   ) {}
 
   // On WebSocket connection — verify the JWT token.
@@ -360,5 +365,54 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server,
       this.onlineUsers,
     );
+  }
+
+  @SubscribeMessage('blockUser')
+  async handleBlockUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    const userId: number = client.data.user?.id;
+    if (!userId) return;
+    try {
+      const dto = validateDto(BlockUserDto, data);
+      await this.blockedService.block(userId, dto.userId);
+      const blocked = await this.blockedService.getBlockedUsers(userId);
+      client.emit('blockedList', blocked.map((u) => UserMapper.toPayload(u)));
+      // Notify the blocked user so they can remove blocker from conversations/contacts
+      const blockedUserSocketId = this.onlineUsers.get(dto.userId);
+      if (blockedUserSocketId) {
+        this.server
+          .to(blockedUserSocketId)
+          .emit('youWereBlocked', { userId });
+      }
+    } catch (error) {
+      client.emit('error', { message: error?.message || 'Failed to block user' });
+    }
+  }
+
+  @SubscribeMessage('unblockUser')
+  async handleUnblockUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    const userId: number = client.data.user?.id;
+    if (!userId) return;
+    try {
+      const dto = validateDto(BlockUserDto, data);
+      await this.blockedService.unblock(userId, dto.userId);
+      const blocked = await this.blockedService.getBlockedUsers(userId);
+      client.emit('blockedList', blocked.map((u) => UserMapper.toPayload(u)));
+    } catch (error) {
+      client.emit('error', { message: error?.message || 'Failed to unblock user' });
+    }
+  }
+
+  @SubscribeMessage('getBlockedList')
+  async handleGetBlockedList(@ConnectedSocket() client: Socket) {
+    const userId: number = client.data.user?.id;
+    if (!userId) return;
+    const blocked = await this.blockedService.getBlockedUsers(userId);
+    client.emit('blockedList', blocked.map((u) => UserMapper.toPayload(u)));
   }
 }

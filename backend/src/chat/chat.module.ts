@@ -10,6 +10,7 @@ import { ConversationsModule } from '../conversations/conversations.module';
 import { MessagesModule } from '../messages/messages.module';
 import { FriendsModule } from '../friends/friends.module';
 import { BlockedModule } from '../blocked/blocked.module';
+import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { BlockedModule } from '../blocked/blocked.module';
     FriendsModule,
     BlockedModule,
     LinkPreviewModule,
+    PushNotificationsModule,
   ],
   providers: [
     ChatGateway,

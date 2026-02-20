@@ -16,6 +16,7 @@ class AuthForm extends StatefulWidget {
 }
 
 class _AuthFormState extends State<AuthForm> {
+  final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _loading = false;
@@ -27,10 +28,17 @@ class _AuthFormState extends State<AuthForm> {
     super.dispose();
   }
 
-  Future<void> _handleSubmit() async {
-    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      return;
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Password is required';
+    if (value.length < 8) return 'Password must be at least 8 characters';
+    if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$').hasMatch(value)) {
+      return 'Must contain uppercase, lowercase, and a number';
     }
+    return null;
+  }
+
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     await widget.onSubmit(
       _usernameController.text.trim(),
@@ -42,46 +50,56 @@ class _AuthFormState extends State<AuthForm> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _usernameController,
-          style: RpgTheme.bodyFont(fontSize: 14, color: colorScheme.onSurface),
-          decoration: RpgTheme.rpgInputDecoration(
-            hintText: widget.isLogin ? 'Username or username#tag' : 'Username',
-            prefixIcon: Icons.person_outlined,
-            context: context,
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _usernameController,
+            style: RpgTheme.bodyFont(fontSize: 14, color: colorScheme.onSurface),
+            decoration: RpgTheme.rpgInputDecoration(
+              hintText: widget.isLogin ? 'Username or username#tag' : 'Username',
+              prefixIcon: Icons.person_outlined,
+              context: context,
+            ),
+            onFieldSubmitted: (_) => _handleSubmit(),
+            validator: (value) =>
+                (value == null || value.isEmpty) ? 'Username is required' : null,
           ),
-          onSubmitted: (_) => _handleSubmit(),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _passwordController,
-          style: RpgTheme.bodyFont(fontSize: 14, color: colorScheme.onSurface),
-          decoration: RpgTheme.rpgInputDecoration(
-            hintText: widget.isLogin ? 'Password' : 'Password (min 8 chars)',
-            prefixIcon: Icons.lock_outlined,
-            context: context,
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _passwordController,
+            style: RpgTheme.bodyFont(fontSize: 14, color: colorScheme.onSurface),
+            decoration: RpgTheme.rpgInputDecoration(
+              hintText: widget.isLogin ? 'Password' : 'Password (min 8 chars)',
+              prefixIcon: Icons.lock_outlined,
+              context: context,
+            ),
+            obscureText: true,
+            onFieldSubmitted: (_) => _handleSubmit(),
+            // Enforce strength only on registration; login just needs non-empty
+            validator: widget.isLogin
+                ? (value) =>
+                    (value == null || value.isEmpty) ? 'Password is required' : null
+                : _validatePassword,
           ),
-          obscureText: true,
-          onSubmitted: (_) => _handleSubmit(),
-        ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: _loading ? null : _handleSubmit,
-          child: _loading
-              ? SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: colorScheme.primary,
-                  ),
-                )
-              : Text(widget.isLogin ? 'Login' : 'Create Account'),
-        ),
-      ],
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: _loading ? null : _handleSubmit,
+            child: _loading
+                ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colorScheme.primary,
+                    ),
+                  )
+                : Text(widget.isLogin ? 'Login' : 'Create Account'),
+          ),
+        ],
+      ),
     );
   }
 }

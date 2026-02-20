@@ -3,6 +3,9 @@ import { MessagesService } from '../../messages/messages.service';
 import { ConversationsService } from '../../conversations/conversations.service';
 import { FriendsService } from '../../friends/friends.service';
 import { UsersService } from '../../users/users.service';
+import { BlockedService } from '../../blocked/blocked.service';
+import { LinkPreviewService } from './link-preview.service';
+import { PushNotificationsService } from '../../push-notifications/push-notifications.service';
 import { ChatMessageService } from './chat-message.service';
 import { User } from '../../users/user.entity';
 import { Conversation } from '../../conversations/conversation.entity';
@@ -69,6 +72,18 @@ describe('ChatMessageService', () => {
         {
           provide: UsersService,
           useValue: { findById: jest.fn() },
+        },
+        {
+          provide: BlockedService,
+          useValue: { isBlockedByEither: jest.fn().mockResolvedValue(false) },
+        },
+        {
+          provide: LinkPreviewService,
+          useValue: { fetchPreview: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: PushNotificationsService,
+          useValue: { notify: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile();

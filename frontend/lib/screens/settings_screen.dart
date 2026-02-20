@@ -10,6 +10,7 @@ import '../widgets/avatar_circle.dart';
 import '../widgets/dialogs/reset_password_dialog.dart';
 import '../widgets/dialogs/delete_account_dialog.dart';
 import '../widgets/top_snackbar.dart';
+import 'blocked_users_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -281,6 +282,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   context,
                   'Coming soon',
                   backgroundColor: Theme.of(context).colorScheme.primary,
+                );
+              },
+            ),
+
+            _buildSettingsTile(
+              icon: Icons.block,
+              title: 'Blocked',
+              trailing: Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const BlockedUsersScreen(),
+                  ),
                 );
               },
             ),

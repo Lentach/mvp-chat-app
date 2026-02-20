@@ -120,6 +120,14 @@ erDiagram
         timestamp createdAt
         timestamp respondedAt "nullable"
     }
+
+    fcm_tokens {
+        int id PK
+        int userId
+        string token "unique, FCM registration token"
+        string platform "'web'|'android'|'ios'"
+        timestamp createdAt
+    }
 ```
 
 **TypeORM config:** `synchronize: true` -- column additions auto-apply on restart. No migrations.
@@ -369,6 +377,8 @@ Each user has a 4-digit tag (1000–9999), random at registration. Display forma
 | **Chat** | `chat/chat.gateway.ts`, `chat/services/chat-{message,conversation,friend-request}.service.ts` |
 | **DTOs** | `chat/dto/chat.dto.ts` (main), `chat/dto/{send-ping,clear-chat-history,set-disappearing-timer,delete-conversation-only,delete-message}.dto.ts` |
 | **Mappers** | `chat/mappers/{conversation,user,friend-request}.mapper.ts`, `messages/message.mapper.ts` |
+| **FCM Tokens** | `fcm-tokens/fcm-token.entity.ts`, `fcm-tokens/fcm-tokens.service.ts`, `fcm-tokens/fcm-tokens.module.ts` |
+| **Push Notifications** | `push-notifications/push-notifications.service.ts`, `push-notifications/push-notifications.module.ts` |
 | **Utils/Config** | `chat/utils/dto.validator.ts`, `cloudinary/cloudinary.service.ts`, `app.module.ts` |
 
 ### Frontend (`frontend/lib/`)
@@ -382,6 +392,7 @@ Each user has a 4-digit tag (1000–9999), random at registration. Display forma
 | **Screens** | `screens/{auth,main_shell,conversations,contacts,settings,chat_detail,add_or_invitations}_screen.dart` |
 | **Widgets** | `widgets/{chat_input_bar,chat_action_tiles,chat_message_bubble,voice_message_bubble,conversation_tile,top_snackbar,avatar_circle}.dart` |
 | **Theme** | `theme/rpg_theme.dart` |
+| **Push** | `services/push_service.dart`, `lib/firebase_options.dart` (placeholder — run FlutterFire CLI) |
 
 ---
 
@@ -465,6 +476,16 @@ Frontend runs locally: `flutter run -d chrome`
 
 ## 13. Recent Changes
 
+**2026-02-20 (session 2):**
+- **Push Notifications (FCM):** Silent push (privacy like Signal — FCM only sees `{ type: 'new_message' }`, no message content).
+  - Backend: `FcmToken` entity/service/module (`backend/src/fcm-tokens/`); `PushNotificationsService` (`backend/src/push-notifications/`) uses `firebase-admin`; gracefully disabled if `FIREBASE_SERVICE_ACCOUNT` env var not set. `POST /users/fcm-token` + `DELETE /users/fcm-token` REST endpoints. `chat-message.service.ts` calls `pushNotificationsService.notify(recipientId)` when recipient offline (same for pings). `users.service.ts` cleans up FCM tokens on account deletion. `app.module.ts` + `chat.module.ts` updated.
+  - Frontend: `firebase_core ^3.8.0` + `firebase_messaging ^15.1.6` added to pubspec. `lib/firebase_options.dart` placeholder (run FlutterFire CLI to replace). `main.dart` calls `Firebase.initializeApp()` with try-catch (graceful if not configured). `PushService` (`lib/services/push_service.dart`) — init on connect, unregister on logout. `ApiService` has `registerFcmToken` + `removeFcmToken`. `ChatProvider` initializes push on first `onConnect` callback. `AuthProvider.logout()` unregisters FCM before clearing JWT. Android: `settings.gradle.kts` + `app/build.gradle.kts` have google-services plugin; `AndroidManifest.xml` has `POST_NOTIFICATIONS`. Web: `frontend/web/firebase-messaging-sw.js`.
+  - **Setup required before it works:** (1) Create Firebase project → add Android/iOS/Web apps → download config files → run FlutterFire CLI → set `FIREBASE_SERVICE_ACCOUNT` env var. (2) Replace TODO values in `firebase_options.dart`, `push_service.dart` (VAPID key), and `firebase-messaging-sw.js`. See plan for full setup steps.
+  - 55 backend tests still pass.
+
+**2026-02-20:**
+- **Password consistency:** Extracted `PASSWORD_REGEX` + `PASSWORD_MIN_LENGTH` to `backend/src/auth/password.constants.ts` — single source of truth for both `RegisterDto` and `ResetPasswordDto`. Unified regex to `/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/` (allows any char; previously `RegisterDto` had a character whitelist that differed from `ResetPasswordDto`). Removed redundant `validatePassword()` from `AuthService` (DTO validation is the only layer needed). Frontend `auth_form.dart`: converted to `TextFormField` + `Form`, added password strength validation on registration (same rule as backend). New test file `backend/src/auth/password.spec.ts` (21 tests: `RegisterDto`, `ResetPasswordDto`, cross-check consistency). Fixed pre-existing `chat-message.service.spec.ts` failure: added missing `BlockedService` + `LinkPreviewService` mocks. Total: 55 tests, 8 suites.
+
 **2026-02-19 (session 3):**
 - **`youWereBlocked` push event + `_blockedByUserIds`:** When user B blocks user A, backend pushes `youWereBlocked` to A's socket in real time. `ChatProvider` handles it: adds B's ID to `_blockedByUserIds` (Set), removes B from `_friends`, removes shared conversations, clears active chat if it was with B. New getter `blockedByUserIds` exposed. `SocketService` now requires `onYouWereBlocked` callback in `connect()`.
 
@@ -502,7 +523,7 @@ Frontend runs locally: `flutter run -d chrome`
 - Message pagination: simple limit/offset (default 50), `_conversationsWithUnread()` has N+1
 
 ### Tech Debt
-- 28 unit tests (no DB). Run: `npm test`
+- 55 unit tests (no DB). Run: `npm test`
 - Manual E2E scripts in `scripts/`
 - Large files: `chat_provider.dart` (~654 lines), `chat-friend-request.service.ts` (~428 lines)
 

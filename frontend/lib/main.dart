@@ -1,5 +1,7 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/settings_provider.dart';
@@ -7,8 +9,16 @@ import 'screens/auth_screen.dart';
 import 'screens/main_shell.dart';
 import 'theme/rpg_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (_) {
+    // Firebase not configured yet — push notifications will be disabled.
+    // Run FlutterFire CLI to set up: see lib/firebase_options.dart for instructions.
+  }
   runApp(const RpgChatApp());
 }
 

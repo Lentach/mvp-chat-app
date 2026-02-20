@@ -111,6 +111,12 @@ export class UnfriendDto {
   userId: number;
 }
 
+export class BlockUserDto {
+  @IsNumber()
+  @IsPositive()
+  userId: number;
+}
+
 export * from './clear-chat-history.dto';
 export * from './set-disappearing-timer.dto';
 export * from './delete-conversation-only.dto';
