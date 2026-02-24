@@ -59,6 +59,19 @@ class MessageModel {
   final String? linkPreviewImageUrl;
   final String? encryptedContent;
 
+  /// True if this message has E2E encrypted content and was sent by another
+  /// user (needs decryption before display).
+  bool needsDecryption(int? currentUserId) =>
+      encryptedContent != null &&
+      encryptedContent!.isNotEmpty &&
+      senderId != currentUserId;
+
+  /// True if this message should show "Encrypted message" placeholder in list.
+  bool get displayAsEncryptedPlaceholder =>
+      encryptedContent != null &&
+      encryptedContent!.isNotEmpty &&
+      content == '[encrypted]';
+
   MessageModel({
     required this.id,
     required this.content,

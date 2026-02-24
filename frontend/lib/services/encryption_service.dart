@@ -84,13 +84,7 @@ class EncryptionService {
             base64Encode(signedPreKey.getKeyPair().publicKey.serialize()),
         'signedPreKeySignature': base64Encode(signedPreKey.signature),
       },
-      'oneTimePreKeys': preKeys
-          .map((pk) => {
-                'keyId': pk.id,
-                'publicKey':
-                    base64Encode(pk.getKeyPair().publicKey.serialize()),
-              })
-          .toList(),
+      'oneTimePreKeys': preKeys.map(_preKeyToUploadFormat).toList(),
     };
 
     await _storage.write(key: 'e2e_setup_complete', value: 'true');
@@ -103,6 +97,10 @@ class EncryptionService {
   }
 
   /// Build a session with the given user from their pre-key bundle.
+  ///
+  /// [preKeyBundle] must contain: registrationId, identityPublicKey,
+  /// signedPreKeyId, signedPreKeyPublic, signedPreKeySignature.
+  /// Optional: oneTimePreKeyId, oneTimePreKeyPublic (null when no unused OTPs).
   Future<void> buildSession(
       int userId, Map<String, dynamic> preKeyBundle) async {
     final address = SignalProtocolAddress(userId.toString(), _deviceId);
@@ -188,13 +186,7 @@ class EncryptionService {
     debugPrint(
         '[EncryptionService] Generated ${preKeys.length} more pre-keys (nextId=${nextId + _preKeyBatchSize})');
 
-    return preKeys
-        .map((pk) => {
-              'keyId': pk.id,
-              'publicKey':
-                  base64Encode(pk.getKeyPair().publicKey.serialize()),
-            })
-        .toList();
+    return preKeys.map(_preKeyToUploadFormat).toList();
   }
 
   /// Get the identity key fingerprint (for display in Privacy & Safety).
@@ -214,7 +206,12 @@ class EncryptionService {
     return groups.join(' ');
   }
 
-  /// Clear all encryption keys from storage (on logout or account deletion).
+  static Map<String, dynamic> _preKeyToUploadFormat(PreKeyRecord pk) => {
+        'keyId': pk.id,
+        'publicKey': base64Encode(pk.getKeyPair().publicKey.serialize()),
+      };
+
+  /// Clear all encryption keys from storage (call on account deletion only).
   Future<void> clearAllKeys() async {
     await _storage.deleteAll();
     _initialized = false;

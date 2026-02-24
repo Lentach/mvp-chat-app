@@ -68,7 +68,7 @@ cd frontend && flutter run -d chrome
 - Message history decrypts async: renders immediately, then decrypts in-place with `notifyListeners()`
 - Own messages skip decryption (sender has plaintext from optimistic display)
 - Conversation list shows "Encrypted message" for encrypted lastMessage (not decrypted at list level)
-- Session establishment uses Completer with 10s timeout — falls back to unencrypted on failure
+- Session establishment uses Completer with 10s timeout — on failure, message marked as failed (no unencrypted fallback)
 - Keys NOT cleared on logout (persist for re-login). Only cleared on account deletion via `clearEncryptionKeys()`
 
 ---
@@ -334,7 +334,7 @@ erDiagram
 
 `libsignal_protocol_dart` v0.7.4 + `flutter_secure_storage`. **Text messages only** — media not yet encrypted. X3DH key agreement -> Double Ratchet. Single-device (deviceId=1). TOFU verification.
 
-**Send:** content -> `LinkPreviewService.fetchPreview()` -> build envelope `{content, linkPreview?}` -> `_ensureSession(recipientId)` (Completer-based pre-key fetch) -> `encrypt()` -> emit with `encryptedContent`. **Receive:** if `encryptedContent` present, decrypt async + parse envelope + update in-place. **Fallback:** if encryption fails, sends unencrypted.
+**Send:** content -> `LinkPreviewService.fetchPreview()` -> build envelope -> `_ensureSession(recipientId)` (Completer-based pre-key fetch) -> `encrypt()` -> emit with `encryptedContent`. **Receive:** if `encryptedContent` present, decrypt async + parse envelope + update in-place. **No fallback:** if E2E not ready or encryption fails, message is marked as failed (no unencrypted sending).
 
 **Ciphertext format:** `"{type}:{base64}"` (type 3 = PreKeySignalMessage, type 1 = SignalMessage). Server stores in `encryptedContent`, stores `"[encrypted]"` as `content` placeholder.
 
