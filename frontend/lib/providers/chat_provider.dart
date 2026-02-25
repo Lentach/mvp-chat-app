@@ -822,6 +822,7 @@ class ChatProvider extends ChangeNotifier {
       final result = await api.uploadVoiceMessage(
         token: _reconnect.tokenForReconnect!,
         duration: duration,
+        recipientId: recipientId,
         expiresIn: effectiveExpiresIn,
         audioPath: localAudioPath,
         audioBytes: localAudioBytes,
