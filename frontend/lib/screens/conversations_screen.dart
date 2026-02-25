@@ -91,8 +91,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         color: colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: isDark
-                FireplaceColors.of(context).convItemBorder,
+            color: FireplaceColors.of(context).convItemBorder,
           ),
         ),
       ),

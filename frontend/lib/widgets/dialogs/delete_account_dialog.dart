@@ -39,7 +39,7 @@ class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
       backgroundColor: colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+        side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
       ),
       child: Container(
         padding: const EdgeInsets.all(24),
@@ -98,7 +98,7 @@ class _DeleteAccountDialogState extends State<DeleteAccountDialog> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                    borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
                   ),
                 ),
                 style: RpgTheme.bodyFont(color: textColor),

@@ -43,7 +43,7 @@ class SettingsProvider extends ChangeNotifier {
       else if (legacy == 'dark' || legacy == 'system') saved = 'blue';
     }
     if (saved == 'light' || saved == 'dark' || saved == 'blue') {
-      _themePreference = saved;
+      _themePreference = saved!;
     } else {
       _themePreference = 'blue';
     }

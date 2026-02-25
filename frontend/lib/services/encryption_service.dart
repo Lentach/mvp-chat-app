@@ -19,15 +19,18 @@ class EncryptionService {
   bool _initialized = false;
   bool get isInitialized => _initialized;
 
+  int? _userId;
+
   /// True if keys were just generated and need to be uploaded to the server.
   bool needsKeyUpload = false;
 
   /// Public key data to upload to the server (set after key generation).
   Map<String, dynamic>? _keysForUpload;
 
-  /// Initialize the encryption service. Loads keys from secure storage
-  /// or generates new ones if this is a fresh install.
-  Future<void> initialize() async {
+  /// Initialize the encryption service for the given user. Loads keys from
+  /// secure storage or generates new ones if this is a fresh install.
+  Future<void> initialize(int userId) async {
+    _userId = userId;
     _identityStore = SecureIdentityKeyStore(_storage);
     _preKeyStore = SecurePreKeyStore(_storage);
     _signedPreKeyStore = SecureSignedPreKeyStore(_storage);
@@ -210,6 +213,51 @@ class EncryptionService {
         'keyId': pk.id,
         'publicKey': base64Encode(pk.getKeyPair().publicKey.serialize()),
       };
+
+  /// Build the public key bundle from stored keys for re-upload on reconnect.
+  /// Returns null if keys are not loaded yet.
+  Future<Map<String, dynamic>?> getKeyBundleForReupload() async {
+    if (!_initialized) return null;
+    try {
+      final keyPair = await _identityStore.getIdentityKeyPair();
+      final registrationId = await _identityStore.getLocalRegistrationId();
+      final signedPreKey = await _signedPreKeyStore.loadSignedPreKey(0);
+      return {
+        'registrationId': registrationId,
+        'identityPublicKey': base64Encode(keyPair.getPublicKey().serialize()),
+        'signedPreKeyId': signedPreKey.id,
+        'signedPreKeyPublic':
+            base64Encode(signedPreKey.getKeyPair().publicKey.serialize()),
+        'signedPreKeySignature': base64Encode(signedPreKey.signature),
+      };
+    } catch (e) {
+      debugPrint('[EncryptionService] getKeyBundleForReupload failed: $e');
+      return null;
+    }
+  }
+
+  /// Persist decrypted message content to survive app restart.
+  Future<void> saveDecryptedContent(int id, Map<String, dynamic> data) async {
+    final userId = _userId;
+    if (userId == null) return;
+    await _storage.write(
+      key: 'e2e_${userId}_decrypted_$id',
+      value: jsonEncode(data),
+    );
+  }
+
+  /// Retrieve persisted decrypted message content, or null if not found.
+  Future<Map<String, dynamic>?> getDecryptedContent(int id) async {
+    final userId = _userId;
+    if (userId == null) return null;
+    final raw = await _storage.read(key: 'e2e_${userId}_decrypted_$id');
+    if (raw == null) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Clear all encryption keys from storage (call on account deletion only).
   Future<void> clearAllKeys() async {

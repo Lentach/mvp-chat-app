@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/encryption_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/chat_provider.dart';
 import '../theme/rpg_theme.dart';
 
 class PrivacySafetyScreen extends StatefulWidget {
@@ -20,9 +21,7 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
   }
 
   Future<void> _loadFingerprint() async {
-    final enc = EncryptionService();
-    await enc.initialize();
-    final fp = await enc.getIdentityFingerprint();
+    final fp = await context.read<ChatProvider>().getIdentityFingerprint();
     if (mounted) {
       setState(() {
         _fingerprint = fp;

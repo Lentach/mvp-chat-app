@@ -421,6 +421,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (msg == null) return const SizedBox.shrink();
 
     final isDark = RpgTheme.isDark(context);
+    final fc = FireplaceColors.of(context);
     final borderColor = Theme.of(context).colorScheme.primary;
     final mutedColor = isDark ? Colors.white60 : Colors.black54;
 

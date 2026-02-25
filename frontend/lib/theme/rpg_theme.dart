@@ -33,7 +33,7 @@ class FireplaceColors extends ThemeExtension<FireplaceColors> {
       Theme.of(context).extension<FireplaceColors>()!;
 
   @override
-  ThemeExtension<FireplaceColors> copyWith({/* unused */}) => this;
+  ThemeExtension<FireplaceColors> copyWith() => this;
 
   @override
   ThemeExtension<FireplaceColors> lerp(

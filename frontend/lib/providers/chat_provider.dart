@@ -1485,6 +1485,10 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Identity key fingerprint for display in Privacy & Safety screen.
+  Future<String?> getIdentityFingerprint() =>
+      _encryptionService.getIdentityFingerprint();
+
   /// Clear all E2E encryption keys. Call on account deletion only.
   Future<void> clearEncryptionKeys() async {
     await _encryptionService.clearAllKeys();
