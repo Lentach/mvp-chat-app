@@ -23,12 +23,6 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
-    @InjectRepository(Conversation)
-    private convRepo: Repository<Conversation>,
-    @InjectRepository(Message)
-    private messageRepo: Repository<Message>,
-    @InjectRepository(FriendRequest)
-    private friendRequestRepo: Repository<FriendRequest>,
     private cloudinaryService: CloudinaryService,
     private fcmTokensService: FcmTokensService,
     private keyBundlesService: KeyBundlesService,
