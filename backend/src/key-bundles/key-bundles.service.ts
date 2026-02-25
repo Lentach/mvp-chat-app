@@ -75,6 +75,10 @@ export class KeyBundlesService {
     if (otp) {
       otp.used = true;
       await this.otpRepo.save(otp);
+    } else {
+      // No OTPs left — session will be established without one-time pre-key,
+      // reducing forward secrecy. Client should replenish via uploadOneTimePreKeys.
+      this.logger.warn(`OTP exhausted for userId=${userId}: serving bundle without one-time pre-key`);
     }
 
     return {

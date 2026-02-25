@@ -28,6 +28,7 @@ export class SendMessageDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(10000)
   encryptedContent?: string; // Base64-encoded Signal Protocol ciphertext
 
   @IsOptional()
